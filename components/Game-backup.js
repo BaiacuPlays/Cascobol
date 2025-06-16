@@ -524,8 +524,6 @@ class CascobolGame {
 
         if (this.kickSystem.isCharging && this.kickSystem.chargingPlayer) {
             const player = this.kickSystem.chargingPlayer;
-            const currentTime = Date.now();
-            const chargeTime = currentTime - this.kickSystem.chargeStartTime;
 
             // Update aim angle based on player input (apenas rotação)
             let aimX = 0, aimY = 0;
@@ -956,7 +954,7 @@ class CascobolGame {
         let goombasHit = 0;
 
         // Check team 1 goombas
-        this.goombaPositions.team1.forEach((goomba, index) => {
+        this.goombaPositions.team1.forEach((goomba) => {
             if (!goomba.active) return;
 
             const dx = this.shell.x - goomba.x;
@@ -974,7 +972,7 @@ class CascobolGame {
         });
 
         // Check team 2 goombas
-        this.goombaPositions.team2.forEach((goomba, index) => {
+        this.goombaPositions.team2.forEach((goomba) => {
             if (!goomba.active) return;
 
             const dx = this.shell.x - goomba.x;
@@ -1179,8 +1177,6 @@ class CascobolGame {
         const limitDistance = 60;
         const playerAreaLeft = fieldX + limitDistance + 30;
         const playerAreaRight = fieldX + fieldWidth - limitDistance - 30;
-        const playerAreaTop = fieldY + limitDistance + 30;
-        const playerAreaBottom = fieldY + fieldHeight - limitDistance - 30;
 
         // Reset players to starting positions (dentro da área permitida)
         // Time 1 (esquerda)
@@ -1426,7 +1422,7 @@ class CascobolGame {
 
     }
 
-    drawFieldBoundaries(fieldX, fieldY, fieldWidth, fieldHeight) {
+    drawFieldBoundaries(fieldX, fieldY, fieldWidth, fieldHeight) ;{
         this.ctx.strokeStyle = '#FFFFFF';
         this.ctx.lineWidth = 4;
 
@@ -1489,7 +1485,7 @@ class CascobolGame {
         };
     }
 
-    drawGoombaZones(fieldX, fieldY, fieldWidth, fieldHeight) {
+    drawGoombaZones(fieldX, fieldY, fieldWidth, fieldHeight) ;{
         // Zonas protegidas dos Goombas (áreas onde jogadores não podem entrar)
         const zoneWidth = 60;
 
@@ -1513,7 +1509,7 @@ class CascobolGame {
         this.drawGoombaSpots(fieldX, fieldY, fieldWidth, fieldHeight);
     }
 
-    drawGoombaSpots(fieldX, fieldY, fieldWidth, fieldHeight) {
+    drawGoombaSpots(fieldX, fieldY, fieldWidth, fieldHeight) ;{
         this.ctx.fillStyle = 'rgba(139, 69, 19, 0.6)';
         const spotSize = 20;
         const borderOffset = 30;
@@ -1551,7 +1547,7 @@ class CascobolGame {
         }
     }
 
-    drawGoombas() {
+    drawGoombas() ;{
         // Draw team 1 goombas
         this.goombaPositions.team1.forEach(goomba => {
             if (goomba.active) {
@@ -1567,7 +1563,7 @@ class CascobolGame {
         });
     }
 
-    drawGoomba(x, y, teamColor) {
+    drawGoomba(x, y, teamColor); {
         const radius = 12;
 
         // Shadow
@@ -1610,7 +1606,7 @@ class CascobolGame {
         this.ctx.fill();
     }
 
-    drawPlayer(player, label) {
+    drawPlayer(player, label) ;{
         const radius = player.radius;
 
         // Shadow (modificada para slide)
@@ -1731,7 +1727,7 @@ class CascobolGame {
         }
     }
 
-    drawShell() {
+    drawShell(); {
         const radius = this.shell.radius;
         const speed = Math.sqrt(this.shell.vx * this.shell.vx + this.shell.vy * this.shell.vy);
 
@@ -2120,7 +2116,12 @@ class CascobolGame {
     }
 }
 
-// Initialize game when page loads
-document.addEventListener('DOMContentLoaded', () => {
-    const game = new CascobolGame();
-});
+// Export the class for use in React/Next.js
+export { CascobolGame };
+
+// Initialize game when page loads (for backward compatibility)
+if (typeof document !== 'undefined') {
+    document.addEventListener('DOMContentLoaded', () => {
+        new CascobolGame();
+    });
+}

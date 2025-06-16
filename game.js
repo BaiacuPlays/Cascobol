@@ -524,8 +524,6 @@ class CascobolGame {
 
         if (this.kickSystem.isCharging && this.kickSystem.chargingPlayer) {
             const player = this.kickSystem.chargingPlayer;
-            const currentTime = Date.now();
-            const chargeTime = currentTime - this.kickSystem.chargeStartTime;
 
             // Update aim angle based on player input (apenas rotação)
             let aimX = 0, aimY = 0;
@@ -956,7 +954,7 @@ class CascobolGame {
         let goombasHit = 0;
 
         // Check team 1 goombas
-        this.goombaPositions.team1.forEach((goomba, index) => {
+        this.goombaPositions.team1.forEach((goomba) => {
             if (!goomba.active) return;
 
             const dx = this.shell.x - goomba.x;
@@ -974,7 +972,7 @@ class CascobolGame {
         });
 
         // Check team 2 goombas
-        this.goombaPositions.team2.forEach((goomba, index) => {
+        this.goombaPositions.team2.forEach((goomba) => {
             if (!goomba.active) return;
 
             const dx = this.shell.x - goomba.x;
@@ -1179,8 +1177,6 @@ class CascobolGame {
         const limitDistance = 60;
         const playerAreaLeft = fieldX + limitDistance + 30;
         const playerAreaRight = fieldX + fieldWidth - limitDistance - 30;
-        const playerAreaTop = fieldY + limitDistance + 30;
-        const playerAreaBottom = fieldY + fieldHeight - limitDistance - 30;
 
         // Reset players to starting positions (dentro da área permitida)
         // Time 1 (esquerda)
@@ -1426,7 +1422,7 @@ class CascobolGame {
 
     }
 
-    drawFieldBoundaries(fieldX, fieldY, fieldWidth, fieldHeight) {
+    drawFieldBoundaries(fieldX, fieldY, fieldWidth, fieldHeight) ;{
         this.ctx.strokeStyle = '#FFFFFF';
         this.ctx.lineWidth = 4;
 
@@ -1489,7 +1485,7 @@ class CascobolGame {
         };
     }
 
-    drawGoombaZones(fieldX, fieldY, fieldWidth, fieldHeight) {
+    drawGoombaZones(fieldX, fieldY, fieldWidth, fieldHeight) ;{
         // Zonas protegidas dos Goombas (áreas onde jogadores não podem entrar)
         const zoneWidth = 60;
 
@@ -1513,7 +1509,7 @@ class CascobolGame {
         this.drawGoombaSpots(fieldX, fieldY, fieldWidth, fieldHeight);
     }
 
-    drawGoombaSpots(fieldX, fieldY, fieldWidth, fieldHeight) {
+    drawGoombaSpots(fieldX, fieldY, fieldWidth, fieldHeight) ;{
         this.ctx.fillStyle = 'rgba(139, 69, 19, 0.6)';
         const spotSize = 20;
         const borderOffset = 30;
@@ -1551,7 +1547,7 @@ class CascobolGame {
         }
     }
 
-    drawGoombas() {
+    drawGoombas() ;{
         // Draw team 1 goombas
         this.goombaPositions.team1.forEach(goomba => {
             if (goomba.active) {
@@ -1567,7 +1563,7 @@ class CascobolGame {
         });
     }
 
-    drawGoomba(x, y, teamColor) {
+    drawGoomba(x, y, teamColor); {
         const radius = 12;
 
         // Shadow
@@ -1610,7 +1606,7 @@ class CascobolGame {
         this.ctx.fill();
     }
 
-    drawPlayer(player, label) {
+    drawPlayer(player, label) ;{
         const radius = player.radius;
 
         // Shadow (modificada para slide)
@@ -1731,7 +1727,7 @@ class CascobolGame {
         }
     }
 
-    drawShell() {
+    drawShell(); {
         const radius = this.shell.radius;
         const speed = Math.sqrt(this.shell.vx * this.shell.vx + this.shell.vy * this.shell.vy);
 
@@ -1824,7 +1820,7 @@ class CascobolGame {
         }
     }
 
-    drawKickAim() {
+    drawKickAim() ;{
         if (!this.kickSystem.chargingPlayer) return;
 
         const player = this.kickSystem.chargingPlayer;
@@ -1900,7 +1896,7 @@ class CascobolGame {
         this.ctx.setLineDash([]);
     }
 
-    drawResetOverlay() {
+    drawResetOverlay(); {
         const currentTime = Date.now();
         const resetTime = currentTime - this.resetStartTime;
         const progress = Math.min(resetTime / this.resetDuration, 1);
@@ -1947,7 +1943,7 @@ class CascobolGame {
         this.ctx.strokeRect(barX, barY, barWidth, barHeight);
     }
 
-    drawCelebrationOverlay() {
+    drawCelebrationOverlay() ;{
         const currentTime = Date.now();
         const celebrationTime = currentTime - this.celebrationStartTime;
         const progress = Math.min(celebrationTime / this.celebrationDuration, 1);
@@ -2010,7 +2006,7 @@ class CascobolGame {
         this.drawCelebrationParticles(celebrationTime);
     }
 
-    drawCelebrationParticles(time) {
+    drawCelebrationParticles(time); {
         const particleCount = 20;
 
         for (let i = 0; i < particleCount; i++) {
@@ -2024,7 +2020,7 @@ class CascobolGame {
         }
     }
 
-    drawStar(x, y, spikes, outerRadius, innerRadius) {
+    drawStar(x, y, spikes, outerRadius, innerRadius); {
         let rot = Math.PI / 2 * 3;
         let step = Math.PI / spikes;
 
@@ -2052,7 +2048,7 @@ class CascobolGame {
         this.ctx.stroke();
     }
 
-    drawHitEffects() {
+    drawHitEffects() ;{
         if (!this.hitEffects) return;
 
         this.hitEffects.forEach(effect => {
@@ -2106,21 +2102,20 @@ class CascobolGame {
         });
     }
 
-    updateUI() {
+    updateUI() ;{
         document.getElementById('team1Goombas').textContent = `${this.team1.goombas} Goombas`;
         document.getElementById('team2Goombas').textContent = `${this.team2.goombas} Goombas`;
         document.getElementById('gameTimer').textContent = this.formatTime(this.gameTime);
     }
 
-    formatTime(ms) {
+    formatTime(ms); {
         const seconds = Math.floor(ms / 1000);
         const minutes = Math.floor(seconds / 60);
         const remainingSeconds = seconds % 60;
         return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
     }
-}
 
 // Initialize game when page loads
 document.addEventListener('DOMContentLoaded', () => {
-    const game = new CascobolGame();
+    new CascobolGame();
 });

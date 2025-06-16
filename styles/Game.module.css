@@ -1,18 +1,5 @@
-/* Reset e Base */
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
-
-body {
-    font-family: 'Arial', sans-serif;
-    background: linear-gradient(135deg, #87CEEB 0%, #98FB98 100%);
-    min-height: 100vh;
-    overflow: hidden;
-}
-
-#gameContainer {
+/* Game Container */
+.gameContainer {
     position: relative;
     width: 100vw;
     height: 100vh;
@@ -30,12 +17,10 @@ body {
     justify-content: center;
 }
 
-.screen.active {
-    display: flex;
-}
+/* Removed duplicate - moved to bottom with animation */
 
 /* Tela de Início */
-.start-content {
+.startContent {
     background: white;
     padding: 40px;
     border-radius: 20px;
@@ -45,7 +30,7 @@ body {
     width: 90%;
 }
 
-.start-content h1 {
+.startContent h1 {
     color: #FF6B35;
     font-size: 3em;
     margin-bottom: 10px;
@@ -58,7 +43,7 @@ body {
     margin-bottom: 30px;
 }
 
-.game-info {
+.gameInfo {
     text-align: left;
     background: #f5f5f5;
     padding: 20px;
@@ -66,17 +51,17 @@ body {
     margin-bottom: 30px;
 }
 
-.game-info h3 {
+.gameInfo h3 {
     color: #FF6B35;
     margin-bottom: 15px;
     text-align: center;
 }
 
-.game-info ul {
+.gameInfo ul {
     list-style: none;
 }
 
-.game-info li {
+.gameInfo li {
     margin-bottom: 10px;
     padding-left: 5px;
 }
@@ -85,28 +70,28 @@ body {
     margin-left: 20px;
 }
 
-.controls-grid {
+.controlsGrid {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
 }
 
-.player-controls {
+.playerControls {
     background: white;
     padding: 10px;
     border-radius: 8px;
     font-size: 0.9em;
 }
 
-.player-controls.team1 {
+.playerControls.team1 {
     border-left: 4px solid #DC143C;
 }
 
-.player-controls.team2 {
+.playerControls.team2 {
     border-left: 4px solid #4169E1;
 }
 
-.game-button {
+.gameButton {
     background: linear-gradient(45deg, #FF6B35, #F7931E);
     color: white;
     border: none;
@@ -118,99 +103,129 @@ body {
     font-weight: bold;
 }
 
-.game-button:hover {
+.gameButton:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 20px rgba(255, 107, 53, 0.4);
 }
 
-.game-button.secondary {
+.gameButton.secondary {
     background: linear-gradient(45deg, #666, #888);
 }
 
-.game-button.secondary:hover {
+.gameButton.secondary:hover {
     box-shadow: 0 6px 20px rgba(102, 102, 102, 0.4);
 }
 
 /* Tela do Jogo */
-#gameScreen {
+.gameScreen {
     flex-direction: column;
-    padding: 20px;
+    padding: 0;
+    width: 100vw;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
 }
 
-.game-header {
-    background: white;
-    padding: 15px 30px;
-    border-radius: 15px;
-    margin-bottom: 20px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
-    width: 100%;
-    max-width: 1200px;
+.gameHeader {
+    background: rgba(255, 255, 255, 0.95);
+    padding: 6px 12px;
+    border-radius: 10px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    max-width: 80vw;
+    width: auto;
+    min-width: 300px;
+    font-size: 0.9em;
 }
 
-.score-display {
+.scoreDisplay {
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
-.team-score {
+.teamScore {
     display: flex;
     flex-direction: column;
     align-items: center;
     font-weight: bold;
 }
 
-.team-score.team1 {
+.teamScore.team1 {
     color: #DC143C;
 }
 
-.team-score.team2 {
+.teamScore.team2 {
     color: #4169E1;
 }
 
-.team-name {
-    font-size: 1.1em;
-    margin-bottom: 5px;
+.teamName {
+    font-size: 0.9em;
+    margin-bottom: 3px;
 }
 
-.goomba-count {
-    font-size: 1.3em;
-    padding: 5px 15px;
-    border-radius: 20px;
+.goombaCount {
+    font-size: 1.1em;
+    padding: 3px 10px;
+    border-radius: 15px;
     background: rgba(255, 255, 255, 0.8);
 }
 
-.game-timer {
-    font-size: 1.5em;
+.gameTimer {
+    font-size: 1.2em;
     font-weight: bold;
     color: #333;
     background: #f0f0f0;
-    padding: 10px 20px;
-    border-radius: 20px;
-}
-
-.game-area {
-    border: 4px solid #8B4513;
+    padding: 6px 12px;
     border-radius: 15px;
-    overflow: hidden;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    margin-bottom: 20px;
 }
 
-#gameCanvas {
+.gameArea {
+    border: none;
+    border-radius: 0;
+    overflow: hidden;
+    margin: 0;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    flex: 1;
+    position: relative;
+}
+
+.gameCanvas {
     display: block;
     background: #228B22;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    border: none;
+    position: absolute;
+    top: 0;
+    left: 0;
 }
 
-.controls-display {
-    background: rgba(0, 0, 0, 0.8);
+.controlsDisplay {
+    background: rgba(0, 0, 0, 0.9);
     color: white;
-    padding: 15px 30px;
-    border-radius: 25px;
+    padding: 6px 12px;
+    border-radius: 12px;
     text-align: center;
+    position: absolute;
+    bottom: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 10;
+    max-width: 80vw;
+    width: auto;
+    font-size: 0.75em;
 }
 
-.kick-instructions {
+.kickInstructions {
     margin-top: 10px;
     padding: 10px;
     background: rgba(255, 255, 255, 0.1);
@@ -219,24 +234,24 @@ body {
     color: #FFD700;
 }
 
-.player-controls-info {
+.playerControlsInfo {
     display: flex;
     justify-content: space-around;
     gap: 30px;
 }
 
-.team1-controls {
+.team1Controls {
     color: #FF6B6B;
     text-align: center;
 }
 
-.team2-controls {
+.team2Controls {
     color: #6495ED;
     text-align: center;
 }
 
 /* Tela de Fim */
-.end-content {
+.endContent {
     background: white;
     padding: 40px;
     border-radius: 20px;
@@ -246,25 +261,25 @@ body {
     width: 90%;
 }
 
-.end-content h1 {
+.endContent h1 {
     font-size: 2.5em;
     margin-bottom: 20px;
     color: #FF6B35;
 }
 
-.final-stats {
+.finalStats {
     background: #f5f5f5;
     padding: 20px;
     border-radius: 10px;
     margin-bottom: 30px;
 }
 
-.final-stats p {
+.finalStats p {
     margin-bottom: 10px;
     font-size: 1.1em;
 }
 
-.end-buttons {
+.endButtons {
     display: flex;
     gap: 15px;
     justify-content: center;
@@ -273,7 +288,7 @@ body {
 
 /* Responsivo */
 @media (max-width: 768px) {
-    .start-content {
+    .startContent {
         padding: 20px;
         margin: 20px;
     }
@@ -282,24 +297,38 @@ body {
         flex-direction: column;
     }
 
-    .score-display {
+    .scoreDisplay {
         flex-direction: column;
         gap: 10px;
     }
 
-    .player-controls-info {
+    .playerControlsInfo {
         flex-direction: column;
         gap: 10px;
     }
 
-    #gameCanvas {
-        width: 100%;
-        height: auto;
-        max-width: 600px;
+    .gameCanvas {
+        width: 100vw;
+        height: 100vh;
     }
 
-    .end-buttons {
+    .endButtons {
         flex-direction: column;
+    }
+
+    .gameArea {
+        width: 100vw;
+        height: 100vh;
+    }
+
+    .gameHeader {
+        max-width: 90vw;
+        min-width: 300px;
+    }
+
+    .controlsDisplay {
+        max-width: 95vw;
+        font-size: 0.8em;
     }
 }
 
@@ -310,7 +339,7 @@ body {
     100% { transform: scale(1); }
 }
 
-.team-score.winning {
+.teamScore.winning {
     animation: pulse 1s infinite;
 }
 
@@ -319,6 +348,8 @@ body {
     to { opacity: 1; transform: translateY(0); }
 }
 
+/* Animation for active screens */
 .screen.active {
+    display: flex;
     animation: fadeIn 0.5s ease-out;
 }
