@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cascobol - Mario Party 9</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="gameContainer">
+        <!-- Tela de Início -->
+        <div id="startScreen" class="screen active">
+            <div class="start-content">
+                <h1>🎮 Cascobol</h1>
+                <p class="subtitle">Inspirado no Mario Party 9</p>
+                <div class="game-info">
+                    <h3>Como Jogar:</h3>
+                    <ul>
+                        <li>🎯 <strong>Objetivo:</strong> Elimine todos os 7 Goombas do time adversário</li>
+                        <li>⚽ <strong>Controles:</strong></li>
+                        <li class="controls">
+                            <div class="controls-grid">
+                                <span class="player-controls team1">
+                                    <strong>Jogador 1 (Vermelho):</strong><br>
+                                    WASD + Segure Espaço + Shift Esq (Carrinho)
+                                </span>
+                                <span class="player-controls team1">
+                                    <strong>Jogador 2 (Vermelho):</strong><br>
+                                    TFGH + Segure R + Q (Carrinho)
+                                </span>
+                                <span class="player-controls team2">
+                                    <strong>Jogador 3 (Azul):</strong><br>
+                                    Setas + Segure Enter + Shift Dir (Carrinho)
+                                </span>
+                                <span class="player-controls team2">
+                                    <strong>Jogador 4 (Azul):</strong><br>
+                                    IJKL + Segure O + U (Carrinho)
+                                </span>
+                            </div>
+                        </li>
+                        <li>🎯 <strong>Sistema de Chute:</strong> Segure o botão de chute para parar e mirar. Use as teclas de movimento para girar e escolher a direção. Solte para chutar!</li>
+                        <li>🏆 <strong>Vitória:</strong> Primeiro a eliminar todos os Goombas adversários</li>
+                    </ul>
+                </div>
+                <button id="startButton" class="game-button">Iniciar Jogo</button>
+            </div>
+        </div>
+
+        <!-- Tela do Jogo -->
+        <div id="gameScreen" class="screen">
+            <div class="game-header">
+                <div class="score-display">
+                    <div class="team-score team1">
+                        <span class="team-name">Time Vermelho</span>
+                        <span class="goomba-count" id="team1Goombas">7 Goombas</span>
+                    </div>
+                    <div class="game-timer">
+                        <span id="gameTimer">0:00</span>
+                    </div>
+                    <div class="team-score team2">
+                        <span class="team-name">Time Azul</span>
+                        <span class="goomba-count" id="team2Goombas">7 Goombas</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="game-area">
+                <canvas id="gameCanvas" width="1200" height="800"></canvas>
+            </div>
+
+            <div class="controls-display">
+                <div class="player-controls-info">
+                    <div class="team1-controls">
+                        <strong>Time Vermelho:</strong><br>
+                        P1: WASD + Segure Espaço + Shift Esq | P2: TFGH + Segure R + Q
+                    </div>
+                    <div class="team2-controls">
+                        <strong>Time Azul:</strong><br>
+                        P3: Setas + Segure Enter + Shift Dir | P4: IJKL + Segure O + U
+                    </div>
+                </div>
+                <div class="kick-instructions">
+                    💡 <strong>Dica:</strong> Segure o botão de chute para parar e mirar. Use movimento para girar. Solte no momento certo!<br>
+                    ⚡ <strong>Carrinho:</strong> Pressione a tecla de carrinho para fazer um slide tackle! Rouba a bola e atordoa adversários!<br>
+                    ⏱️ <strong>Cooldown:</strong> Após um carrinho, aguarde 2 segundos para fazer outro. Jogadores atordoados ficam imóveis por 1 segundo.
+                </div>
+            </div>
+        </div>
+
+        <!-- Tela de Fim de Jogo -->
+        <div id="endScreen" class="screen">
+            <div class="end-content">
+                <h1 id="winnerText">Time Vermelho Venceu!</h1>
+                <div class="final-stats">
+                    <p>Tempo de jogo: <span id="finalTime">0:00</span></p>
+                    <p>Goombas eliminados: <span id="finalGoombas">7</span></p>
+                </div>
+                <div class="end-buttons">
+                    <button id="playAgainButton" class="game-button">Jogar Novamente</button>
+                    <button id="backToMenuButton" class="game-button secondary">Voltar ao Menu</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="game.js"></script>
+</body>
+</html>

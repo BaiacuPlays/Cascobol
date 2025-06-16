@@ -1,0 +1,1 @@
+{"root":["./src/app.tsx","./src/main.tsx","./src/vite-env.d.ts","./src/components/game.tsx","./src/game/controls.ts","./src/game/gamestate.ts","./src/game/goomba.ts","./src/game/physics.ts","./src/game/player.ts","./src/game/shell.ts","./src/game/team.ts"],"version":"5.8.3"}
