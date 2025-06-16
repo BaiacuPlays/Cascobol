@@ -40,21 +40,18 @@ class CascobolGame {
 
         this.ctx = this.canvas.getContext('2d');
 
-        // Set canvas size to full screen
-        this.canvas.width = window.innerWidth;
-        this.canvas.height = window.innerHeight;
+        // Set canvas size to fixed dimensions
+        this.FIELD_WIDTH = 1000;  // Largura fixa do campo
+        this.FIELD_HEIGHT = 600;  // Altura fixa do campo
+
+        this.canvas.width = this.FIELD_WIDTH;
+        this.canvas.height = this.FIELD_HEIGHT;
 
         // Ensure canvas is properly styled
         this.canvas.style.display = 'block';
         this.canvas.style.backgroundColor = '#228B22'; // Game field color
 
-        // Handle window resize
-        window.addEventListener('resize', () => {
-            this.canvas.width = window.innerWidth;
-            this.canvas.height = window.innerHeight;
-            this.initializeGoombas(); // Recalculate positions
-            this.resetGame(); // Reset player positions
-        });
+        // Remove window resize listener to prevent field resizing
 
         console.log('Canvas found and context created!');
         console.log('Canvas dimensions:', this.canvas.width, 'x', this.canvas.height);
@@ -122,13 +119,13 @@ class CascobolGame {
             lightColor: '#6495ED'
         };
 
-        // Players (4 players total - 2v2)
+        // Players (4 players total - 2v2) - Posições fixas baseadas no campo 1000x600
         this.players = [
             // Team 1 (Red)
             {
                 id: 1,
-                x: 125,
-                y: 225,
+                x: 200,  // Posição fixa no campo
+                y: 250,  // Posição fixa no campo
                 vx: 0,
                 vy: 0,
                 radius: 18,
@@ -157,8 +154,8 @@ class CascobolGame {
             },
             {
                 id: 2,
-                x: 125,
-                y: 375,
+                x: 200,  // Posição fixa no campo
+                y: 350,  // Posição fixa no campo
                 vx: 0,
                 vy: 0,
                 radius: 18,
@@ -188,8 +185,8 @@ class CascobolGame {
             // Team 2 (Blue)
             {
                 id: 3,
-                x: 875,
-                y: 225,
+                x: 800,  // Posição fixa no campo
+                y: 250,  // Posição fixa no campo
                 vx: 0,
                 vy: 0,
                 radius: 18,
@@ -218,8 +215,8 @@ class CascobolGame {
             },
             {
                 id: 4,
-                x: 875,
-                y: 375,
+                x: 800,  // Posição fixa no campo
+                y: 350,  // Posição fixa no campo
                 vx: 0,
                 vy: 0,
                 radius: 18,
@@ -248,10 +245,10 @@ class CascobolGame {
             }
         ];
 
-        // Shell (mais rápida e responsiva)
+        // Shell (mais rápida e responsiva) - Posição fixa no centro do campo
         this.shell = {
-            x: 500,
-            y: 300,
+            x: 500,  // Centro do campo 1000x600
+            y: 300,  // Centro do campo 1000x600
             vx: 0,
             vy: 0,
             radius: 16,
@@ -298,14 +295,12 @@ class CascobolGame {
     }
 
     initializeGoombas() {
-        const { width, height } = this.canvas;
-
-        // Calcula dimensões do campo para ocupar mais da tela
+        // Usa dimensões fixas do campo
         const fieldMargin = 60;
-        const fieldWidth = Math.min(width - fieldMargin * 2, width * 0.9);
-        const fieldHeight = Math.min(height - fieldMargin * 2, height * 0.8);
-        const fieldX = (width - fieldWidth) / 2;
-        const fieldY = (height - fieldHeight) / 2;
+        const fieldWidth = this.FIELD_WIDTH - fieldMargin * 2;
+        const fieldHeight = this.FIELD_HEIGHT - fieldMargin * 2;
+        const fieldX = fieldMargin;
+        const fieldY = fieldMargin;
 
         // Posições dos Goombas nas zonas protegidas (como na referência)
         const borderOffset = 25;
@@ -448,30 +443,24 @@ class CascobolGame {
         this.team1.goombas = 7;
         this.team2.goombas = 7;
 
-        // Calcula posições baseadas no novo tamanho do campo
-        const { width, height } = this.canvas;
+        // Usa dimensões fixas do campo
         const fieldMargin = 60;
-        const fieldWidth = Math.min(width - fieldMargin * 2, width * 0.9);
-        const fieldHeight = Math.min(height - fieldMargin * 2, height * 0.8);
-        const fieldX = (width - fieldWidth) / 2;
-        const fieldY = (height - fieldHeight) / 2;
-        const centerX = fieldX + fieldWidth / 2;
-        const centerY = fieldY + fieldHeight / 2;
+        const fieldWidth = this.FIELD_WIDTH - fieldMargin * 2;
+        const fieldHeight = this.FIELD_HEIGHT - fieldMargin * 2;
+        const fieldX = fieldMargin;
+        const fieldY = fieldMargin;
+        const centerX = this.FIELD_WIDTH / 2;
+        const centerY = this.FIELD_HEIGHT / 2;
 
-        // Posições dos jogadores dentro da área permitida
-        const limitDistance = 60;
-        const playerAreaLeft = fieldX + limitDistance + 30;
-        const playerAreaRight = fieldX + fieldWidth - limitDistance - 30;
+        // Reset players to fixed starting positions
+        this.players[0].x = 200; this.players[0].y = 250; this.players[0].vx = 0; this.players[0].vy = 0;  // Team 1 Player 1
+        this.players[1].x = 200; this.players[1].y = 350; this.players[1].vx = 0; this.players[1].vy = 0;  // Team 1 Player 2
+        this.players[2].x = 800; this.players[2].y = 250; this.players[2].vx = 0; this.players[2].vy = 0;  // Team 2 Player 1
+        this.players[3].x = 800; this.players[3].y = 350; this.players[3].vx = 0; this.players[3].vy = 0;  // Team 2 Player 2
 
-        // Reset players to starting positions
-        this.players[0].x = playerAreaLeft + 50; this.players[0].y = centerY - 50; this.players[0].vx = 0; this.players[0].vy = 0;
-        this.players[1].x = playerAreaLeft + 50; this.players[1].y = centerY + 50; this.players[1].vx = 0; this.players[1].vy = 0;
-        this.players[2].x = centerX + 100; this.players[2].y = centerY - 50; this.players[2].vx = 0; this.players[2].vy = 0; // Mais próximo do centro
-        this.players[3].x = centerX + 100; this.players[3].y = centerY + 50; this.players[3].vx = 0; this.players[3].vy = 0; // Mais próximo do centro
-
-        // Reset shell
-        this.shell.x = centerX;
-        this.shell.y = centerY;
+        // Reset shell to fixed center position
+        this.shell.x = 500;  // Centro fixo do campo
+        this.shell.y = 300;  // Centro fixo do campo
         this.shell.vx = 0;
         this.shell.vy = 0;
         this.shell.owner = null;
@@ -512,6 +501,8 @@ class CascobolGame {
         this.targetZoom = 1;
         this.targetCameraX = 0;
         this.targetCameraY = 0;
+
+
 
         // Reset goal celebration system
         this.goalCelebration = {
@@ -679,7 +670,14 @@ class CascobolGame {
             }
 
             this.updatePlayerPosition(player);
+
+            // Se o jogador está nocauteado e tem a bola, perde a posse
+            if (player.isStunned && this.shell.owner === player) {
+                this.shell.owner = null;
+                console.log(`Jogador ${player.id} perdeu a bola por estar nocauteado!`);
+            }
         });
+
     }
 
     updatePlayerPosition(player) {
@@ -687,20 +685,19 @@ class CascobolGame {
         player.x += player.vx;
         player.y += player.vy;
 
-        // Calcula limites do campo
-        const { width, height } = this.canvas;
+        // Calcula limites do campo usando dimensões fixas
         const fieldMargin = 60;
-        const fieldWidth = Math.min(width - fieldMargin * 2, width * 0.9);
-        const fieldHeight = Math.min(height - fieldMargin * 2, height * 0.8);
-        const fieldX = (width - fieldWidth) / 2;
-        const fieldY = (height - fieldHeight) / 2;
+        const fieldWidth = this.FIELD_WIDTH - fieldMargin * 2;
+        const fieldHeight = this.FIELD_HEIGHT - fieldMargin * 2;
+        const fieldX = fieldMargin;
+        const fieldY = fieldMargin;
 
         // Limites das zonas protegidas dos Goombas - NENHUM jogador pode entrar
-        const goombaProtectionDepth = 70; // Aumentei para empurrar mais para frente
+        const goombaProtectionDepth = 70;
 
         // TODOS os jogadores são bloqueados em ambas as zonas dos goombas
-        const minX = fieldX + goombaProtectionDepth + player.radius; // Não pode entrar na zona vermelha (esquerda)
-        const maxX = fieldX + fieldWidth - goombaProtectionDepth - player.radius; // Não pode entrar na zona azul (direita)
+        const minX = fieldX + goombaProtectionDepth + player.radius;
+        const maxX = fieldX + fieldWidth - goombaProtectionDepth - player.radius;
 
         // Limites verticais (todo o campo)
         const minY = fieldY + player.radius;
@@ -780,8 +777,10 @@ class CascobolGame {
     updateShell() {
         // Se a bola tem dono, ela fica grudada no jogador
         if (this.shell.owner) {
-            this.shell.x = this.shell.owner.x;
-            this.shell.y = this.shell.owner.y - 25; // Um pouco acima do jogador
+            // Posiciona a bola ligeiramente à frente do jogador baseado no time
+            const offsetX = this.shell.owner.team === 1 ? 30 : -30; // Time 1 vai para direita, Time 2 para esquerda
+            this.shell.x = this.shell.owner.x + offsetX;
+            this.shell.y = this.shell.owner.y; // Mesma altura do jogador
             this.shell.vx = 0;
             this.shell.vy = 0;
             return;
@@ -804,22 +803,35 @@ class CascobolGame {
         this.shell.x += this.shell.vx;
         this.shell.y += this.shell.vy;
 
-        // Calcula limites do campo
-        const { width, height } = this.canvas;
+        // Calcula limites do campo usando dimensões fixas
         const fieldMargin = 60;
-        const fieldWidth = Math.min(width - fieldMargin * 2, width * 0.9);
-        const fieldHeight = Math.min(height - fieldMargin * 2, height * 0.8);
-        const fieldX = (width - fieldWidth) / 2;
-        const fieldY = (height - fieldHeight) / 2;
+        const fieldWidth = this.FIELD_WIDTH - fieldMargin * 2;
+        const fieldHeight = this.FIELD_HEIGHT - fieldMargin * 2;
+        const fieldX = fieldMargin;
+        const fieldY = fieldMargin;
 
-        // Bounce off walls
-        if (this.shell.x - this.shell.radius < fieldX || this.shell.x + this.shell.radius > fieldX + fieldWidth) {
-            this.shell.vx *= -0.8;
-            this.shell.x = Math.max(fieldX + this.shell.radius, Math.min(fieldX + fieldWidth - this.shell.radius, this.shell.x));
+        // Física de colisão com as paredes - mais realista
+        const bounceReduction = 0.8;
+
+        // Parede esquerda
+        if (this.shell.x - this.shell.radius < fieldX) {
+            this.shell.x = fieldX + this.shell.radius;
+            this.shell.vx = Math.abs(this.shell.vx) * bounceReduction; // Inverte e reduz
         }
-        if (this.shell.y - this.shell.radius < fieldY || this.shell.y + this.shell.radius > fieldY + fieldHeight) {
-            this.shell.vy *= -0.8;
-            this.shell.y = Math.max(fieldY + this.shell.radius, Math.min(fieldY + fieldHeight - this.shell.radius, this.shell.y));
+        // Parede direita
+        if (this.shell.x + this.shell.radius > fieldX + fieldWidth) {
+            this.shell.x = fieldX + fieldWidth - this.shell.radius;
+            this.shell.vx = -Math.abs(this.shell.vx) * bounceReduction; // Inverte e reduz
+        }
+        // Parede superior
+        if (this.shell.y - this.shell.radius < fieldY) {
+            this.shell.y = fieldY + this.shell.radius;
+            this.shell.vy = Math.abs(this.shell.vy) * bounceReduction; // Inverte e reduz
+        }
+        // Parede inferior
+        if (this.shell.y + this.shell.radius > fieldY + fieldHeight) {
+            this.shell.y = fieldY + fieldHeight - this.shell.radius;
+            this.shell.vy = -Math.abs(this.shell.vy) * bounceReduction; // Inverte e reduz
         }
     }
 
@@ -864,7 +876,17 @@ class CascobolGame {
     }
 
     checkCollisions() {
-        // Player-Shell collisions
+        // Player-Shell collisions with physics
+        this.checkPlayerShellCollisions();
+
+        // Shell-Goomba collisions
+        this.checkShellGoombaCollisions();
+
+        // Player-Player collisions with physics
+        this.checkPlayerCollisions();
+    }
+
+    checkPlayerShellCollisions() {
         this.players.forEach(player => {
             const dx = player.x - this.shell.x;
             const dy = player.y - this.shell.y;
@@ -873,7 +895,7 @@ class CascobolGame {
             // Increased collision radius for easier ball pickup
             const collisionRadius = player.radius + this.shell.radius + 15;
 
-            if (distance < collisionRadius) {
+            if (distance < collisionRadius && !player.isStunned) {
                 // Verifica se a bola está se movendo rápido (foi chutada recentemente)
                 const shellSpeed = Math.sqrt(this.shell.vx * this.shell.vx + this.shell.vy * this.shell.vy);
 
@@ -884,25 +906,45 @@ class CascobolGame {
                     this.shell.vy = 0;
                     console.log(`Jogador ${player.id} pegou a concha livre!`);
                 }
-                // Se a bola tem dono de time adversário, permite roubo sempre (exceto se foi chutada pelo próprio jogador)
-                else if (this.shell.owner && this.shell.owner.team !== player.team && this.shell.lastOwner !== player) {
-                    console.log(`Jogador ${player.id} roubou a bola do jogador ${this.shell.owner.id}!`);
-                    this.shell.owner = player;
-                    this.shell.vx = 0;
-                    this.shell.vy = 0;
+                // Se a bola tem dono de time adversário, permite roubo
+                else if (this.shell.owner && this.shell.owner.team !== player.team) {
+                    // Roubo normal - só funciona se o jogador estiver fazendo dash/slide
+                    if (player.isSliding) {
+                        console.log(`Jogador ${player.id} roubou a bola com dash do jogador ${this.shell.owner.id}!`);
+                        this.shell.owner = player;
+                        this.shell.vx = 0;
+                        this.shell.vy = 0;
+                    }
+                    // Roubo por proximidade - só se a bola não foi chutada recentemente
+                    else if (shellSpeed < 1 && this.shell.lastOwner !== player) {
+                        console.log(`Jogador ${player.id} roubou a bola por proximidade do jogador ${this.shell.owner.id}!`);
+                        this.shell.owner = player;
+                        this.shell.vx = 0;
+                        this.shell.vy = 0;
+                    }
                 }
                 // Se a bola já pertence ao jogador, mantém a posse
                 else if (this.shell.owner === player) {
                     // Já tem a bola, não precisa fazer nada
                 }
             }
+
+            // Física de colisão - evitar sobreposição APENAS se o jogador NÃO possui a bola
+            if (this.shell.owner !== player) {
+                const minDistance = player.radius + this.shell.radius;
+                if (distance < minDistance && distance > 0) {
+                    const overlap = minDistance - distance;
+                    const separationX = (dx / distance) * overlap * 0.5;
+                    const separationY = (dy / distance) * overlap * 0.5;
+
+                    // Separar jogador e bola
+                    player.x += separationX;
+                    player.y += separationY;
+                    this.shell.x -= separationX;
+                    this.shell.y -= separationY;
+                }
+            }
         });
-
-        // Shell-Goomba collisions
-        this.checkShellGoombaCollisions();
-
-        // Player-Player slide tackle collisions
-        this.checkPlayerCollisions();
     }
 
     checkShellGoombaCollisions() {
@@ -965,13 +1007,48 @@ class CascobolGame {
                 const dx = player1.x - player2.x;
                 const dy = player1.y - player2.y;
                 const distance = Math.sqrt(dx * dx + dy * dy);
+                const minDistance = player1.radius + player2.radius;
 
-                if (distance < player1.radius + player2.radius) {
-                    // Check for slide tackle
-                    if (player1.isSliding && !player2.isStunned) {
+                if (distance < minDistance && distance > 0) {
+                    // Física de colisão - separar jogadores
+                    const overlap = minDistance - distance;
+                    const separationX = (dx / distance) * overlap * 0.5;
+                    const separationY = (dy / distance) * overlap * 0.5;
+
+                    // Separar os jogadores
+                    player1.x += separationX;
+                    player1.y += separationY;
+                    player2.x -= separationX;
+                    player2.y -= separationY;
+
+                    // Check for slide tackle e roubo de bola
+                    // Jogador nocauteado não pode fazer slide tackle nem roubar bola
+                    if (player1.isSliding && !player2.isStunned && !player1.isStunned && player1.team !== player2.team) {
                         this.handleSlideTackle(player1, player2);
-                    } else if (player2.isSliding && !player1.isStunned) {
+                        // Se o player2 tem a bola, player1 rouba
+                        if (this.shell.owner === player2) {
+                            this.shell.owner = player1;
+                            console.log(`Jogador ${player1.id} roubou a bola com dash do jogador ${player2.id}!`);
+                        }
+                    } else if (player2.isSliding && !player1.isStunned && !player2.isStunned && player1.team !== player2.team) {
                         this.handleSlideTackle(player2, player1);
+                        // Se o player1 tem a bola, player2 rouba
+                        if (this.shell.owner === player1) {
+                            this.shell.owner = player2;
+                            console.log(`Jogador ${player2.id} roubou a bola com dash do jogador ${player1.id}!`);
+                        }
+                    }
+                    // Roubo por proximidade entre jogadores de times diferentes
+                    else if (player1.team !== player2.team) {
+                        // Se um jogador está próximo do outro que tem a bola, pode roubar
+                        // MAS apenas se o jogador que vai roubar NÃO estiver nocauteado
+                        if (this.shell.owner === player2 && !player1.isStunned) {
+                            this.shell.owner = player1;
+                            console.log(`Jogador ${player1.id} roubou a bola por proximidade do jogador ${player2.id}!`);
+                        } else if (this.shell.owner === player1 && !player2.isStunned) {
+                            this.shell.owner = player2;
+                            console.log(`Jogador ${player2.id} roubou a bola por proximidade do jogador ${player1.id}!`);
+                        }
                     }
                 }
             }
@@ -985,10 +1062,12 @@ class CascobolGame {
         victim.isStunned = true;
         victim.stunnedTime = victim.maxStunnedTime;
 
-        // If victim has the shell, steal it
+        // If victim has the shell, steal it (garantido)
         if (this.shell.owner === victim) {
             this.shell.owner = tackler;
-            console.log(`Jogador ${tackler.id} roubou a concha!`);
+            this.shell.vx = 0;
+            this.shell.vy = 0;
+            console.log(`Jogador ${tackler.id} roubou a concha com slide tackle!`);
         }
 
         // Add knockback to victim
@@ -996,9 +1075,12 @@ class CascobolGame {
         const dy = victim.y - tackler.y;
         const length = Math.sqrt(dx * dx + dy * dy);
         if (length > 0) {
-            victim.vx += (dx / length) * 3;
-            victim.vy += (dy / length) * 3;
+            victim.vx += (dx / length) * 5; // Aumentei o knockback
+            victim.vy += (dy / length) * 5;
         }
+
+        // Add hit effect
+        this.addHitEffect(victim.x, victim.y, '#FFD700');
     }
 
     addHitEffect(x, y, color) {
@@ -1224,12 +1306,12 @@ class CascobolGame {
     }
 
     drawField() {
-        const { width, height } = this.canvas;
+        // Usa dimensões fixas do campo
         const fieldMargin = 60;
-        const fieldWidth = Math.min(width - fieldMargin * 2, width * 0.9);
-        const fieldHeight = Math.min(height - fieldMargin * 2, height * 0.8);
-        const fieldX = (width - fieldWidth) / 2;
-        const fieldY = (height - fieldHeight) / 2;
+        const fieldWidth = this.FIELD_WIDTH - fieldMargin * 2;
+        const fieldHeight = this.FIELD_HEIGHT - fieldMargin * 2;
+        const fieldX = fieldMargin;
+        const fieldY = fieldMargin;
 
         // Draw field background
         this.ctx.fillStyle = '#32CD32';
@@ -1387,8 +1469,6 @@ class CascobolGame {
             this.ctx.font = 'bold 16px Arial';
             this.ctx.fillText('⭐', player.x, player.y - player.radius - 15);
         }
-
-
     }
 
     drawShell() {
@@ -1541,6 +1621,57 @@ class CascobolGame {
             this.ctx.fillText('GOL!', this.canvas.width / 2, this.canvas.height / 2 - 60);
             this.ctx.shadowBlur = 0;
         }
+    }
+
+    // Função para converter coordenadas 2D para perspectiva 3D
+    to3D(x, y, z = 0) {
+        // Verificação de segurança - se perspective não estiver inicializado, retorna valores simples
+        if (!this.perspective || !this.canvas) {
+            return { x: x, y: y, scale: 1 };
+        }
+
+        // Usa valores seguros
+        const angle = 25; // Fixo para evitar problemas
+        const depth = 0.7;
+        const horizon = 0.4;
+        const fieldElevation = 80;
+        const angleRad = (angle * Math.PI) / 180;
+
+        // Aplica transformação simples
+        const perspectiveY = y * depth - z * 0.5;
+
+        // Ajusta a posição Y
+        const screenY = perspectiveY + (this.canvas.height * horizon) + fieldElevation;
+
+        // Escala simples
+        const scale = Math.max(0.5, 1 - (y * 0.0005));
+
+        // Verifica se os valores são válidos
+        const finalX = isFinite(x) ? x : 0;
+        const finalY = isFinite(screenY) ? screenY : y;
+        const finalScale = isFinite(scale) ? scale : 1;
+
+        return {
+            x: finalX,
+            y: finalY,
+            scale: finalScale
+        };
+    }
+
+    // Função para converter coordenadas do campo para coordenadas de tela
+    fieldToScreen(fieldX, fieldY, elevation = 0) {
+        // Aplica transformação 3D
+        const transformed = this.to3D(fieldX, fieldY, elevation);
+
+        // Centraliza na tela - com valores padrão se canvas não estiver disponível
+        const centerX = this.canvas ? this.canvas.width / 2 : 400;
+        const centerY = this.canvas ? this.canvas.height / 2 : 300;
+
+        return {
+            x: transformed.x + centerX + this.cameraX,
+            y: transformed.y + this.cameraY,
+            scale: transformed.scale * this.cameraZoom
+        };
     }
 
     updateCamera() {

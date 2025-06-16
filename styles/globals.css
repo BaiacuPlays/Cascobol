@@ -74,12 +74,42 @@ textarea:focus {
   outline-offset: 2px;
 }
 
+/* Game Canvas Styles */
+#gameCanvas {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border: 3px solid #333;
+  border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  z-index: 1;
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+}
+
+/* Ensure canvas maintains aspect ratio */
+@media (max-width: 1100px) {
+  #gameCanvas {
+    width: 90vw;
+    height: auto;
+  }
+}
+
+@media (max-height: 700px) {
+  #gameCanvas {
+    height: 90vh;
+    width: auto;
+  }
+}
+
 /* Print styles */
 @media print {
   body {
     background: white !important;
   }
-  
+
   .no-print {
     display: none !important;
   }
