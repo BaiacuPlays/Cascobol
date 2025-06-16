@@ -51,6 +51,20 @@ class CascobolGame {
         this.canvas.style.display = 'block';
         this.canvas.style.backgroundColor = '#228B22'; // Game field color
 
+        // Load field background image
+        this.fieldImage = new Image();
+        this.fieldImage.src = '/campo.webp';
+        this.fieldImageLoaded = false;
+
+        this.fieldImage.onload = () => {
+            this.fieldImageLoaded = true;
+            console.log('Campo image loaded successfully');
+        };
+
+        this.fieldImage.onerror = () => {
+            console.error('Failed to load campo image');
+        };
+
         // Remove window resize listener to prevent field resizing
 
         console.log('Canvas found and context created!');
@@ -138,6 +152,7 @@ class CascobolGame {
                     left: 'KeyA',
                     right: 'KeyD',
                     action: 'Space',
+                    pass: 'KeyC',
                     steal: 'ShiftLeft'
                 },
                 // Slide tackle properties
@@ -168,6 +183,7 @@ class CascobolGame {
                     left: 'KeyF',
                     right: 'KeyH',
                     action: 'KeyR',
+                    pass: 'KeyV',
                     steal: 'KeyQ'
                 },
                 // Slide tackle properties
@@ -199,6 +215,7 @@ class CascobolGame {
                     left: 'ArrowLeft',
                     right: 'ArrowRight',
                     action: 'Enter',
+                    pass: 'Slash',
                     steal: 'ShiftRight'
                 },
                 // Slide tackle properties
@@ -229,6 +246,7 @@ class CascobolGame {
                     left: 'KeyJ',
                     right: 'KeyL',
                     action: 'KeyO',
+                    pass: 'KeyP',
                     steal: 'KeyU'
                 },
                 // Slide tackle properties
@@ -254,7 +272,11 @@ class CascobolGame {
             radius: 16,
             owner: null,
             lastOwner: null,
-            speed: 12 // Velocidade base aumentada
+            speed: 12, // Velocidade base aumentada
+            protectionTime: 0, // Tempo de proteção contra roubo
+            protectionDuration: 1000, // 1 segundo de proteção
+            trail: [], // Array para armazenar posições do rastro
+            rotation: 0 // Rotação da bola para efeito visual
         };
 
         // Sistema de movimento e chute 360°
@@ -264,7 +286,14 @@ class CascobolGame {
             chargeStartTime: 0,
             maxChargeTime: 1500, // 1.5 segundos para carga máxima
             minPower: 3,
-            maxPower: 15
+            maxPower: 15,
+            actionType: 'kick' // 'kick' ou 'pass'
+        };
+
+        // Sistema de passe
+        this.passSystem = {
+            passPower: 8, // Força fixa do passe
+            passRange: 300 // Alcance máximo para encontrar companheiro
         };
 
 
@@ -332,18 +361,26 @@ class CascobolGame {
             this.keys[e.code] = true;
 
             // Prevent default for all game keys
-            const gameKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'KeyT', 'KeyG', 'KeyF', 'KeyH', 'KeyR', 'KeyQ',
-                             'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'ShiftRight', 'KeyI', 'KeyK', 'KeyJ', 'KeyL', 'KeyO', 'KeyU'];
+            const gameKeys = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'KeyC', 'ShiftLeft', 'KeyT', 'KeyG', 'KeyF', 'KeyH', 'KeyR', 'KeyV', 'KeyQ',
+                             'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Slash', 'ShiftRight', 'KeyI', 'KeyK', 'KeyJ', 'KeyL', 'KeyO', 'KeyP', 'KeyU'];
             if (gameKeys.includes(e.code)) {
                 e.preventDefault();
             }
 
-            // Start charging kick (apenas se não estiver resetando, comemorando ou travado)
+            // Start charging kick or pass (apenas se não estiver resetando, comemorando ou travado)
             if (!this.isResetting && !this.isCelebrating && !this.playersLocked) {
                 this.players.forEach(player => {
+                    // Kick (charged)
                     if (e.code === player.controls.action) {
                         if (this.shell.owner === player && !this.kickSystem.isCharging) {
-                            this.startKickCharge(player);
+                            this.startKickCharge(player, 'kick');
+                        }
+                    }
+
+                    // Pass (instant)
+                    if (e.code === player.controls.pass) {
+                        if (this.shell.owner === player && !this.kickSystem.isCharging) {
+                            this.executePass(player);
                         }
                     }
 
@@ -560,6 +597,7 @@ class CascobolGame {
             this.updatePlayerMovement();
             this.updateKickSystem();
             this.updateShell();
+            this.updateBallProtection();
             this.checkCollisions();
             this.updateGoalCelebration();
             this.checkWinCondition();
@@ -625,11 +663,11 @@ class CascobolGame {
                 return;
             }
 
-            // Se o jogador está carregando chute, não pode se mover
+            // Se o jogador está carregando chute/passe, fica completamente parado (vulnerável)
             if (this.kickSystem.isCharging && this.kickSystem.chargingPlayer === player) {
-                // Aplicar apenas atrito para parar gradualmente
-                player.vx *= friction;
-                player.vy *= friction;
+                // Para completamente - mais vulnerável para roubo
+                player.vx = 0;
+                player.vy = 0;
             } else {
                 // Sistema de movimento livre com física melhorada
                 let inputX = 0, inputY = 0;
@@ -722,10 +760,11 @@ class CascobolGame {
         }
     }
 
-    startKickCharge(player) {
+    startKickCharge(player, actionType = 'kick') {
         this.kickSystem.isCharging = true;
         this.kickSystem.chargingPlayer = player;
         this.kickSystem.chargeStartTime = Date.now();
+        this.kickSystem.actionType = actionType;
     }
 
     releaseKick() {
@@ -761,6 +800,7 @@ class CascobolGame {
         this.shell.vy = dy * power;
         this.shell.owner = null; // Remove ownership
         this.shell.lastOwner = player;
+        this.shell.protectionTime = 0; // Remove proteção quando a bola é chutada - pode ser interceptada
 
 
 
@@ -768,6 +808,63 @@ class CascobolGame {
         this.kickSystem.isCharging = false;
         this.kickSystem.chargingPlayer = null;
         this.kickSystem.chargeStartTime = 0;
+        this.kickSystem.actionType = 'kick';
+    }
+
+    executePass(player) {
+        // Encontra o companheiro de equipe mais próximo
+        const teammate = this.findNearestTeammate(player);
+
+        if (!teammate) {
+            console.log('Nenhum companheiro encontrado para passe!');
+            return;
+        }
+
+        // Calcula direção para o companheiro
+        const dx = teammate.x - player.x;
+        const dy = teammate.y - player.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance > this.passSystem.passRange) {
+            console.log('Companheiro muito longe para passe!');
+            return;
+        }
+
+        // Normaliza direção
+        const normalizedDx = dx / distance;
+        const normalizedDy = dy / distance;
+
+        // Executa passe instantâneo
+        this.shell.vx = normalizedDx * this.passSystem.passPower;
+        this.shell.vy = normalizedDy * this.passSystem.passPower;
+        this.shell.owner = null;
+        this.shell.lastOwner = player;
+        this.shell.protectionTime = 0; // Passe pode ser interceptado
+
+        // Adiciona efeito visual de passe
+        this.addPassEffect(player.x, player.y, teammate.x, teammate.y);
+
+        console.log(`Jogador ${player.id} passou para jogador ${teammate.id}!`);
+    }
+
+    findNearestTeammate(player) {
+        let nearestTeammate = null;
+        let nearestDistance = Infinity;
+
+        this.players.forEach(otherPlayer => {
+            if (otherPlayer.id !== player.id && otherPlayer.team === player.team && !otherPlayer.isStunned) {
+                const dx = otherPlayer.x - player.x;
+                const dy = otherPlayer.y - player.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < nearestDistance && distance <= this.passSystem.passRange) {
+                    nearestDistance = distance;
+                    nearestTeammate = otherPlayer;
+                }
+            }
+        });
+
+        return nearestTeammate;
     }
 
     updateKickSystem() {
@@ -803,6 +900,27 @@ class CascobolGame {
         this.shell.x += this.shell.vx;
         this.shell.y += this.shell.vy;
 
+        // Update trail and rotation - only when ball is moving
+        const speed = Math.sqrt(this.shell.vx * this.shell.vx + this.shell.vy * this.shell.vy);
+        if (speed > 1) {
+            // Add current position to trail
+            this.shell.trail.push({
+                x: this.shell.x,
+                y: this.shell.y,
+                time: Date.now()
+            });
+
+            // Keep only recent trail positions (last 400ms for better visibility)
+            const currentTime = Date.now();
+            this.shell.trail = this.shell.trail.filter(point => currentTime - point.time < 400);
+
+            // Update rotation based on movement
+            this.shell.rotation += speed * 0.1;
+        } else {
+            // Clear trail when ball stops
+            this.shell.trail = [];
+        }
+
         // Calcula limites do campo usando dimensões fixas
         const fieldMargin = 60;
         const fieldWidth = this.FIELD_WIDTH - fieldMargin * 2;
@@ -833,11 +951,75 @@ class CascobolGame {
             this.shell.y = fieldY + fieldHeight - this.shell.radius;
             this.shell.vy = -Math.abs(this.shell.vy) * bounceReduction; // Inverte e reduz
         }
+
+        // Verifica se a bola está travada nas zonas dos goombas e a empurra para fora
+        this.checkBallInGoombaZones(fieldX, fieldY, fieldWidth, fieldHeight);
+    }
+
+    updateBallProtection() {
+        // Atualiza o tempo de proteção da bola
+        if (this.shell.protectionTime > 0) {
+            this.shell.protectionTime -= 16; // Assumindo 60fps (16ms por frame)
+            if (this.shell.protectionTime <= 0) {
+                this.shell.protectionTime = 0;
+                console.log('Proteção da bola expirou - pode ser roubada novamente');
+            }
+        }
+    }
+
+    checkBallInGoombaZones(fieldX, fieldY, fieldWidth, fieldHeight) {
+        // Se a bola tem dono, não precisa verificar (ela está grudada no jogador)
+        if (this.shell.owner) return;
+
+        const goombaProtectionDepth = 70; // Mesma profundidade das zonas
+        const shellSpeed = Math.sqrt(this.shell.vx * this.shell.vx + this.shell.vy * this.shell.vy);
+        const minEscapeSpeed = 2; // Velocidade mínima para empurrar a bola para fora
+
+        // Verifica se a bola está se movendo muito devagar (quase parada)
+        if (shellSpeed > 1) return; // Se está se movendo rápido, não interfere
+
+        let isInGoombaZone = false;
+        let pushDirection = { x: 0, y: 0 };
+
+        // Zona esquerda (goombas vermelhos)
+        if (this.shell.x < fieldX + goombaProtectionDepth) {
+            isInGoombaZone = true;
+            // Empurra para a direita (para fora da zona)
+            pushDirection.x = 1;
+        }
+        // Zona direita (goombas azuis)
+        else if (this.shell.x > fieldX + fieldWidth - goombaProtectionDepth) {
+            isInGoombaZone = true;
+            // Empurra para a esquerda (para fora da zona)
+            pushDirection.x = -1;
+        }
+
+        // Se a bola está em uma zona de goomba e quase parada, empurra para fora
+        if (isInGoombaZone) {
+            // Normaliza a direção se necessário
+            const length = Math.sqrt(pushDirection.x * pushDirection.x + pushDirection.y * pushDirection.y);
+            if (length > 0) {
+                pushDirection.x /= length;
+                pushDirection.y /= length;
+            }
+
+            // Aplica força para empurrar a bola para fora da zona
+            this.shell.vx += pushDirection.x * minEscapeSpeed;
+            this.shell.vy += pushDirection.y * minEscapeSpeed;
+
+            console.log('Bola empurrada para fora da zona dos goombas!');
+        }
     }
 
     attemptSlideTackle(player) {
         // Verifica se pode fazer slide tackle
         if (player.isSliding || player.slideCooldown > 0 || player.isStunned) {
+            return;
+        }
+
+        // Se o jogador tem a bola, executa passe em vez de slide tackle
+        if (this.shell.owner === player) {
+            this.executePass(player);
             return;
         }
 
@@ -904,23 +1086,31 @@ class CascobolGame {
                     this.shell.owner = player;
                     this.shell.vx = 0;
                     this.shell.vy = 0;
-                    console.log(`Jogador ${player.id} pegou a concha livre!`);
+                    this.shell.protectionTime = this.shell.protectionDuration; // Ativa proteção de 1 segundo
+                    console.log(`Jogador ${player.id} pegou a concha livre! Proteção ativada por ${this.shell.protectionDuration}ms`);
                 }
-                // Se a bola tem dono de time adversário, permite roubo
+                // Se a bola tem dono de time adversário, permite roubo (mas verifica proteção)
                 else if (this.shell.owner && this.shell.owner.team !== player.team) {
-                    // Roubo normal - só funciona se o jogador estiver fazendo dash/slide
-                    if (player.isSliding) {
-                        console.log(`Jogador ${player.id} roubou a bola com dash do jogador ${this.shell.owner.id}!`);
-                        this.shell.owner = player;
-                        this.shell.vx = 0;
-                        this.shell.vy = 0;
-                    }
-                    // Roubo por proximidade - só se a bola não foi chutada recentemente
-                    else if (shellSpeed < 1 && this.shell.lastOwner !== player) {
-                        console.log(`Jogador ${player.id} roubou a bola por proximidade do jogador ${this.shell.owner.id}!`);
-                        this.shell.owner = player;
-                        this.shell.vx = 0;
-                        this.shell.vy = 0;
+                    // Verifica se a bola ainda está protegida
+                    if (this.shell.protectionTime > 0) {
+                        console.log(`Tentativa de roubo bloqueada - bola protegida por mais ${this.shell.protectionTime}ms`);
+                    } else {
+                        // Roubo normal - só funciona se o jogador estiver fazendo dash/slide
+                        if (player.isSliding) {
+                            console.log(`Jogador ${player.id} roubou a bola com dash do jogador ${this.shell.owner.id}!`);
+                            this.shell.owner = player;
+                            this.shell.vx = 0;
+                            this.shell.vy = 0;
+                            this.shell.protectionTime = this.shell.protectionDuration; // Ativa proteção para o novo dono
+                        }
+                        // Roubo por proximidade - só se a bola não foi chutada recentemente
+                        else if (shellSpeed < 1 && this.shell.lastOwner !== player) {
+                            console.log(`Jogador ${player.id} roubou a bola por proximidade do jogador ${this.shell.owner.id}!`);
+                            this.shell.owner = player;
+                            this.shell.vx = 0;
+                            this.shell.vy = 0;
+                            this.shell.protectionTime = this.shell.protectionDuration; // Ativa proteção para o novo dono
+                        }
                     }
                 }
                 // Se a bola já pertence ao jogador, mantém a posse
@@ -1025,29 +1215,49 @@ class CascobolGame {
                     // Jogador nocauteado não pode fazer slide tackle nem roubar bola
                     if (player1.isSliding && !player2.isStunned && !player1.isStunned && player1.team !== player2.team) {
                         this.handleSlideTackle(player1, player2);
-                        // Se o player2 tem a bola, player1 rouba
+                        // Se o player2 tem a bola, player1 rouba (mas verifica proteção)
                         if (this.shell.owner === player2) {
-                            this.shell.owner = player1;
-                            console.log(`Jogador ${player1.id} roubou a bola com dash do jogador ${player2.id}!`);
+                            if (this.shell.protectionTime > 0) {
+                                console.log(`Tentativa de roubo com dash bloqueada - bola protegida por mais ${this.shell.protectionTime}ms`);
+                            } else {
+                                this.shell.owner = player1;
+                                this.shell.protectionTime = this.shell.protectionDuration; // Ativa proteção para o novo dono
+                                console.log(`Jogador ${player1.id} roubou a bola com dash do jogador ${player2.id}!`);
+                            }
                         }
                     } else if (player2.isSliding && !player1.isStunned && !player2.isStunned && player1.team !== player2.team) {
                         this.handleSlideTackle(player2, player1);
-                        // Se o player1 tem a bola, player2 rouba
+                        // Se o player1 tem a bola, player2 rouba (mas verifica proteção)
                         if (this.shell.owner === player1) {
-                            this.shell.owner = player2;
-                            console.log(`Jogador ${player2.id} roubou a bola com dash do jogador ${player1.id}!`);
+                            if (this.shell.protectionTime > 0) {
+                                console.log(`Tentativa de roubo com dash bloqueada - bola protegida por mais ${this.shell.protectionTime}ms`);
+                            } else {
+                                this.shell.owner = player2;
+                                this.shell.protectionTime = this.shell.protectionDuration; // Ativa proteção para o novo dono
+                                console.log(`Jogador ${player2.id} roubou a bola com dash do jogador ${player1.id}!`);
+                            }
                         }
                     }
                     // Roubo por proximidade entre jogadores de times diferentes
                     else if (player1.team !== player2.team) {
                         // Se um jogador está próximo do outro que tem a bola, pode roubar
-                        // MAS apenas se o jogador que vai roubar NÃO estiver nocauteado
+                        // MAS apenas se o jogador que vai roubar NÃO estiver nocauteado E a bola não estiver protegida
                         if (this.shell.owner === player2 && !player1.isStunned) {
-                            this.shell.owner = player1;
-                            console.log(`Jogador ${player1.id} roubou a bola por proximidade do jogador ${player2.id}!`);
+                            if (this.shell.protectionTime > 0) {
+                                console.log(`Tentativa de roubo por proximidade bloqueada - bola protegida por mais ${this.shell.protectionTime}ms`);
+                            } else {
+                                this.shell.owner = player1;
+                                this.shell.protectionTime = this.shell.protectionDuration; // Ativa proteção para o novo dono
+                                console.log(`Jogador ${player1.id} roubou a bola por proximidade do jogador ${player2.id}!`);
+                            }
                         } else if (this.shell.owner === player1 && !player2.isStunned) {
-                            this.shell.owner = player2;
-                            console.log(`Jogador ${player2.id} roubou a bola por proximidade do jogador ${player1.id}!`);
+                            if (this.shell.protectionTime > 0) {
+                                console.log(`Tentativa de roubo por proximidade bloqueada - bola protegida por mais ${this.shell.protectionTime}ms`);
+                            } else {
+                                this.shell.owner = player2;
+                                this.shell.protectionTime = this.shell.protectionDuration; // Ativa proteção para o novo dono
+                                console.log(`Jogador ${player2.id} roubou a bola por proximidade do jogador ${player1.id}!`);
+                            }
                         }
                     }
                 }
@@ -1062,12 +1272,13 @@ class CascobolGame {
         victim.isStunned = true;
         victim.stunnedTime = victim.maxStunnedTime;
 
-        // If victim has the shell, steal it (garantido)
+        // If victim has the shell, steal it (garantido - slide tackle ignora proteção)
         if (this.shell.owner === victim) {
             this.shell.owner = tackler;
             this.shell.vx = 0;
             this.shell.vy = 0;
-            console.log(`Jogador ${tackler.id} roubou a concha com slide tackle!`);
+            this.shell.protectionTime = this.shell.protectionDuration; // Ativa proteção para o novo dono
+            console.log(`Jogador ${tackler.id} roubou a concha com slide tackle! Proteção ativada.`);
         }
 
         // Add knockback to victim
@@ -1091,7 +1302,22 @@ class CascobolGame {
             y: y,
             color: color,
             time: 0,
-            maxTime: 500 // 500ms effect
+            maxTime: 500, // 500ms effect
+            type: 'hit'
+        });
+    }
+
+    addPassEffect(fromX, fromY, toX, toY) {
+        if (!this.hitEffects) this.hitEffects = [];
+
+        this.hitEffects.push({
+            fromX: fromX,
+            fromY: fromY,
+            toX: toX,
+            toY: toY,
+            time: 0,
+            maxTime: 800, // 800ms effect
+            type: 'pass'
         });
     }
 
@@ -1231,6 +1457,7 @@ class CascobolGame {
         this.shell.vy = 0;
         this.shell.owner = null;
         this.shell.lastOwner = null;
+        this.shell.protectionTime = 0; // Reset proteção
 
 
     }
@@ -1287,6 +1514,9 @@ class CascobolGame {
             // Draw shell
             this.drawShell();
 
+            // Draw pass indicator when player has ball
+            this.drawPassIndicator();
+
             // Draw kick aim if charging
             if (this.kickSystem && this.kickSystem.isCharging) {
                 this.drawKickAim();
@@ -1313,70 +1543,259 @@ class CascobolGame {
         const fieldX = fieldMargin;
         const fieldY = fieldMargin;
 
-        // Draw field background
-        this.ctx.fillStyle = '#32CD32';
-        this.ctx.fillRect(fieldX, fieldY, fieldWidth, fieldHeight);
+        // Draw Mario Party style background
+        this.drawMarioPartyBackground();
 
-        // Draw field border
-        this.ctx.strokeStyle = '#FFFFFF';
-        this.ctx.lineWidth = 4;
-        this.ctx.strokeRect(fieldX, fieldY, fieldWidth, fieldHeight);
-
-        // Draw center line
-        this.ctx.beginPath();
-        this.ctx.moveTo(fieldX + fieldWidth / 2, fieldY);
-        this.ctx.lineTo(fieldX + fieldWidth / 2, fieldY + fieldHeight);
-        this.ctx.stroke();
-
-        // Draw center circle
-        this.ctx.beginPath();
-        this.ctx.arc(fieldX + fieldWidth / 2, fieldY + fieldHeight / 2, 50, 0, Math.PI * 2);
-        this.ctx.stroke();
+        // Draw field with 3D effect
+        this.drawMarioPartyField(fieldX, fieldY, fieldWidth, fieldHeight);
 
         // Draw goomba zones
         this.drawGoombaZones(fieldX, fieldY, fieldWidth, fieldHeight);
     }
 
+    drawMarioPartyBackground() {
+        // Gradient background like Mario Party
+        const gradient = this.ctx.createLinearGradient(0, 0, 0, this.canvas.height);
+        gradient.addColorStop(0, '#87CEEB'); // Sky blue
+        gradient.addColorStop(0.6, '#98FB98'); // Light green
+        gradient.addColorStop(1, '#90EE90'); // Lighter green
+
+        this.ctx.fillStyle = gradient;
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+        // Add some clouds for atmosphere
+        this.drawClouds();
+    }
+
+    drawClouds() {
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
+
+        // Cloud 1
+        this.drawCloud(150, 80, 40);
+        // Cloud 2
+        this.drawCloud(350, 60, 35);
+        // Cloud 3
+        this.drawCloud(650, 90, 45);
+        // Cloud 4
+        this.drawCloud(850, 70, 38);
+    }
+
+    drawCloud(x, y, size) {
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, size, 0, Math.PI * 2);
+        this.ctx.arc(x + size * 0.6, y, size * 0.8, 0, Math.PI * 2);
+        this.ctx.arc(x + size * 1.2, y, size * 0.7, 0, Math.PI * 2);
+        this.ctx.arc(x + size * 0.3, y - size * 0.5, size * 0.6, 0, Math.PI * 2);
+        this.ctx.arc(x + size * 0.9, y - size * 0.4, size * 0.5, 0, Math.PI * 2);
+        this.ctx.fill();
+    }
+
+    drawMarioPartyField(fieldX, fieldY, fieldWidth, fieldHeight) {
+        // Field shadow (3D effect)
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+        this.ctx.fillRect(fieldX + 6, fieldY + 6, fieldWidth, fieldHeight);
+
+        // Draw field background image if loaded, otherwise use gradient
+        if (this.fieldImageLoaded && this.fieldImage) {
+            // Draw the field image as background
+            this.ctx.drawImage(this.fieldImage, fieldX, fieldY, fieldWidth, fieldHeight);
+        } else {
+            // Fallback: Main field with vibrant green gradient
+            const fieldGradient = this.ctx.createRadialGradient(
+                fieldX + fieldWidth/2, fieldY + fieldHeight/2, 0,
+                fieldX + fieldWidth/2, fieldY + fieldHeight/2, Math.max(fieldWidth, fieldHeight)/2
+            );
+            fieldGradient.addColorStop(0, '#32CD32'); // Lime green center
+            fieldGradient.addColorStop(0.7, '#228B22'); // Forest green
+            fieldGradient.addColorStop(1, '#006400'); // Dark green edges
+
+            this.ctx.fillStyle = fieldGradient;
+            this.ctx.fillRect(fieldX, fieldY, fieldWidth, fieldHeight);
+        }
+
+        // Field border with 3D effect
+        this.ctx.strokeStyle = '#FFFFFF';
+        this.ctx.lineWidth = 6;
+        this.ctx.strokeRect(fieldX, fieldY, fieldWidth, fieldHeight);
+
+        // Inner border for depth
+        this.ctx.strokeStyle = '#F0F0F0';
+        this.ctx.lineWidth = 2;
+        this.ctx.strokeRect(fieldX + 3, fieldY + 3, fieldWidth - 6, fieldHeight - 6);
+
+        // Center line with glow
+        this.ctx.save();
+        this.ctx.shadowColor = '#FFFFFF';
+        this.ctx.shadowBlur = 10;
+        this.ctx.strokeStyle = '#FFFFFF';
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.moveTo(fieldX + fieldWidth / 2, fieldY);
+        this.ctx.lineTo(fieldX + fieldWidth / 2, fieldY + fieldHeight);
+        this.ctx.stroke();
+        this.ctx.restore();
+
+        // Center circle with glow
+        this.ctx.save();
+        this.ctx.shadowColor = '#FFFFFF';
+        this.ctx.shadowBlur = 8;
+        this.ctx.strokeStyle = '#FFFFFF';
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.arc(fieldX + fieldWidth / 2, fieldY + fieldHeight / 2, 50, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.restore();
+
+        // Add grass texture pattern only if image is not loaded
+        if (!this.fieldImageLoaded) {
+            this.drawGrassPattern(fieldX, fieldY, fieldWidth, fieldHeight);
+        }
+    }
+
+    drawGrassPattern(fieldX, fieldY, fieldWidth, fieldHeight) {
+        this.ctx.strokeStyle = 'rgba(0, 100, 0, 0.3)';
+        this.ctx.lineWidth = 1;
+
+        // Vertical grass lines
+        for (let i = 0; i < fieldWidth; i += 20) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(fieldX + i, fieldY);
+            this.ctx.lineTo(fieldX + i, fieldY + fieldHeight);
+            this.ctx.stroke();
+        }
+
+        // Horizontal grass lines
+        for (let i = 0; i < fieldHeight; i += 15) {
+            this.ctx.beginPath();
+            this.ctx.moveTo(fieldX, fieldY + i);
+            this.ctx.lineTo(fieldX + fieldWidth, fieldY + i);
+            this.ctx.stroke();
+        }
+    }
+
     drawGoombaZones(fieldX, fieldY, fieldWidth, fieldHeight) {
-        const goombaProtectionDepth = 70; // Mesma profundidade usada na lógica de colisão
+        const goombaProtectionDepth = 70;
 
-        // Zona dos goombas azuis (direita) - NENHUM jogador pode entrar
-        this.ctx.fillStyle = 'rgba(65, 105, 225, 0.25)';
-        this.ctx.fillRect(fieldX + fieldWidth - goombaProtectionDepth, fieldY, goombaProtectionDepth, fieldHeight);
+        // Red team zone (left) with gradient and glow
+        const redGradient = this.ctx.createLinearGradient(fieldX, fieldY, fieldX + goombaProtectionDepth, fieldY);
+        redGradient.addColorStop(0, 'rgba(220, 20, 60, 0.4)');
+        redGradient.addColorStop(0.7, 'rgba(220, 20, 60, 0.2)');
+        redGradient.addColorStop(1, 'rgba(220, 20, 60, 0.1)');
 
-        // Zona dos goombas vermelhos (esquerda) - NENHUM jogador pode entrar
-        this.ctx.fillStyle = 'rgba(220, 20, 60, 0.25)';
+        this.ctx.fillStyle = redGradient;
         this.ctx.fillRect(fieldX, fieldY, goombaProtectionDepth, fieldHeight);
 
-        // Desenha linhas de demarcação mais visíveis
-        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.lineWidth = 3;
-        this.ctx.setLineDash([10, 5]);
+        // Blue team zone (right) with gradient and glow
+        const blueGradient = this.ctx.createLinearGradient(fieldX + fieldWidth - goombaProtectionDepth, fieldY, fieldX + fieldWidth, fieldY);
+        blueGradient.addColorStop(0, 'rgba(65, 105, 225, 0.1)');
+        blueGradient.addColorStop(0.3, 'rgba(65, 105, 225, 0.2)');
+        blueGradient.addColorStop(1, 'rgba(65, 105, 225, 0.4)');
 
-        // Linha da zona azul (direita)
-        this.ctx.beginPath();
-        this.ctx.moveTo(fieldX + fieldWidth - goombaProtectionDepth, fieldY);
-        this.ctx.lineTo(fieldX + fieldWidth - goombaProtectionDepth, fieldY + fieldHeight);
-        this.ctx.stroke();
+        this.ctx.fillStyle = blueGradient;
+        this.ctx.fillRect(fieldX + fieldWidth - goombaProtectionDepth, fieldY, goombaProtectionDepth, fieldHeight);
 
-        // Linha da zona vermelha (esquerda)
+        // Animated border lines with glow
+        const time = Date.now() * 0.005;
+        const glowIntensity = 0.5 + Math.sin(time) * 0.3;
+
+        // Red zone border
+        this.ctx.save();
+        this.ctx.shadowColor = '#DC143C';
+        this.ctx.shadowBlur = 10 * glowIntensity;
+        this.ctx.strokeStyle = `rgba(220, 20, 60, ${0.8 + glowIntensity * 0.2})`;
+        this.ctx.lineWidth = 4;
+        this.ctx.setLineDash([15, 8]);
+        this.ctx.lineDashOffset = time * 20;
         this.ctx.beginPath();
         this.ctx.moveTo(fieldX + goombaProtectionDepth, fieldY);
         this.ctx.lineTo(fieldX + goombaProtectionDepth, fieldY + fieldHeight);
         this.ctx.stroke();
+        this.ctx.restore();
 
-        this.ctx.setLineDash([]); // Reset line dash
+        // Blue zone border
+        this.ctx.save();
+        this.ctx.shadowColor = '#4169E1';
+        this.ctx.shadowBlur = 10 * glowIntensity;
+        this.ctx.strokeStyle = `rgba(65, 105, 225, ${0.8 + glowIntensity * 0.2})`;
+        this.ctx.lineWidth = 4;
+        this.ctx.setLineDash([15, 8]);
+        this.ctx.lineDashOffset = -time * 20;
+        this.ctx.beginPath();
+        this.ctx.moveTo(fieldX + fieldWidth - goombaProtectionDepth, fieldY);
+        this.ctx.lineTo(fieldX + fieldWidth - goombaProtectionDepth, fieldY + fieldHeight);
+        this.ctx.stroke();
+        this.ctx.restore();
 
-        // Adiciona símbolos de "proibido" nas zonas
-        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        this.ctx.font = 'bold 20px Arial';
+        this.ctx.setLineDash([]);
+
+        // Stylized warning symbols with animation
+        const symbolScale = 1 + Math.sin(time * 2) * 0.1;
+
+        // Red zone symbol
+        this.ctx.save();
+        this.ctx.translate(fieldX + goombaProtectionDepth/2, fieldY + fieldHeight/2);
+        this.ctx.scale(symbolScale, symbolScale);
+        this.ctx.shadowColor = '#DC143C';
+        this.ctx.shadowBlur = 15;
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.font = 'bold 24px Arial';
         this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('⛔', 0, 0);
+        this.ctx.restore();
 
-        // Símbolo na zona vermelha
-        this.ctx.fillText('⛔', fieldX + goombaProtectionDepth/2, fieldY + fieldHeight/2);
+        // Blue zone symbol
+        this.ctx.save();
+        this.ctx.translate(fieldX + fieldWidth - goombaProtectionDepth/2, fieldY + fieldHeight/2);
+        this.ctx.scale(symbolScale, symbolScale);
+        this.ctx.shadowColor = '#4169E1';
+        this.ctx.shadowBlur = 15;
+        this.ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+        this.ctx.font = 'bold 24px Arial';
+        this.ctx.textAlign = 'center';
+        this.ctx.textBaseline = 'middle';
+        this.ctx.fillText('⛔', 0, 0);
+        this.ctx.restore();
 
-        // Símbolo na zona azul
-        this.ctx.fillText('⛔', fieldX + fieldWidth - goombaProtectionDepth/2, fieldY + fieldHeight/2);
+        // Add decorative corner elements
+        this.drawZoneCorners(fieldX, fieldY, goombaProtectionDepth, fieldHeight, '#DC143C');
+        this.drawZoneCorners(fieldX + fieldWidth - goombaProtectionDepth, fieldY, goombaProtectionDepth, fieldHeight, '#4169E1');
+    }
+
+    drawZoneCorners(x, y, width, height, color) {
+        this.ctx.strokeStyle = color;
+        this.ctx.lineWidth = 3;
+        this.ctx.lineCap = 'round';
+
+        const cornerSize = 15;
+
+        // Top-left corner
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y + cornerSize);
+        this.ctx.lineTo(x, y);
+        this.ctx.lineTo(x + cornerSize, y);
+        this.ctx.stroke();
+
+        // Top-right corner
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + width - cornerSize, y);
+        this.ctx.lineTo(x + width, y);
+        this.ctx.lineTo(x + width, y + cornerSize);
+        this.ctx.stroke();
+
+        // Bottom-left corner
+        this.ctx.beginPath();
+        this.ctx.moveTo(x, y + height - cornerSize);
+        this.ctx.lineTo(x, y + height);
+        this.ctx.lineTo(x + cornerSize, y + height);
+        this.ctx.stroke();
+
+        // Bottom-right corner
+        this.ctx.beginPath();
+        this.ctx.moveTo(x + width - cornerSize, y + height);
+        this.ctx.lineTo(x + width, y + height);
+        this.ctx.lineTo(x + width, y + height - cornerSize);
+        this.ctx.stroke();
     }
 
     drawGoombas() {
@@ -1396,116 +1815,387 @@ class CascobolGame {
     }
 
     drawGoomba(x, y, teamColor) {
-        // Goomba body
-        this.ctx.fillStyle = '#8B4513';
+        const radius = 15;
+
+        // Shadow with 3D effect
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         this.ctx.beginPath();
-        this.ctx.arc(x, y, 15, 0, Math.PI * 2);
+        this.ctx.ellipse(x + 3, y + radius + 2, radius * 0.9, radius * 0.3, 0, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Team color indicator
+        // Goomba body with gradient
+        const bodyGradient = this.ctx.createRadialGradient(
+            x - 5, y - 5, 0,
+            x, y, radius
+        );
+        bodyGradient.addColorStop(0, '#D2691E'); // Sandy brown highlight
+        bodyGradient.addColorStop(0.6, '#8B4513'); // Saddle brown
+        bodyGradient.addColorStop(1, '#654321'); // Dark brown shadow
+
+        this.ctx.fillStyle = bodyGradient;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Body outline
+        this.ctx.strokeStyle = '#654321';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y, radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        // Team color indicator with glow
+        this.ctx.save();
+        this.ctx.shadowColor = teamColor;
+        this.ctx.shadowBlur = 8;
         this.ctx.fillStyle = teamColor;
         this.ctx.beginPath();
-        this.ctx.arc(x, y - 5, 5, 0, Math.PI * 2);
+        this.ctx.arc(x, y - 8, 6, 0, Math.PI * 2);
         this.ctx.fill();
+        this.ctx.restore();
 
-        // Eyes
+        // Team color outline
+        this.ctx.strokeStyle = teamColor === '#DC143C' ? '#8B0000' : '#000080';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y - 8, 6, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        // Eyes with 3D effect
         this.ctx.fillStyle = 'white';
         this.ctx.beginPath();
-        this.ctx.arc(x - 5, y - 2, 3, 0, Math.PI * 2);
-        this.ctx.arc(x + 5, y - 2, 3, 0, Math.PI * 2);
+        this.ctx.arc(x - 6, y - 3, 4, 0, Math.PI * 2);
+        this.ctx.arc(x + 6, y - 3, 4, 0, Math.PI * 2);
         this.ctx.fill();
 
+        // Eye outlines
+        this.ctx.strokeStyle = '#CCCCCC';
+        this.ctx.lineWidth = 1;
+        this.ctx.beginPath();
+        this.ctx.arc(x - 6, y - 3, 4, 0, Math.PI * 2);
+        this.ctx.arc(x + 6, y - 3, 4, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        // Pupils with angry expression
         this.ctx.fillStyle = 'black';
         this.ctx.beginPath();
-        this.ctx.arc(x - 5, y - 2, 1.5, 0, Math.PI * 2);
-        this.ctx.arc(x + 5, y - 2, 1.5, 0, Math.PI * 2);
+        this.ctx.arc(x - 6, y - 2, 2, 0, Math.PI * 2);
+        this.ctx.arc(x + 6, y - 2, 2, 0, Math.PI * 2);
         this.ctx.fill();
+
+        // Angry eyebrows
+        this.ctx.strokeStyle = '#654321';
+        this.ctx.lineWidth = 2;
+        this.ctx.lineCap = 'round';
+        this.ctx.beginPath();
+        this.ctx.moveTo(x - 9, y - 8);
+        this.ctx.lineTo(x - 3, y - 6);
+        this.ctx.moveTo(x + 3, y - 6);
+        this.ctx.lineTo(x + 9, y - 8);
+        this.ctx.stroke();
+
+        // Mouth (frown)
+        this.ctx.strokeStyle = '#654321';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.arc(x, y + 3, 4, 0.2 * Math.PI, 0.8 * Math.PI);
+        this.ctx.stroke();
     }
 
     drawPlayer(player, label) {
-        // Player shadow
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.beginPath();
-        this.ctx.arc(player.x + 2, player.y + 2, player.radius, 0, Math.PI * 2);
-        this.ctx.fill();
+        const radius = player.radius;
 
-        // Player body
-        if (player.isStunned) {
-            this.ctx.fillStyle = '#888888'; // Gray when stunned
-        } else if (player.isSliding) {
-            this.ctx.fillStyle = player.lightColor; // Lighter color when sliding
-        } else {
-            this.ctx.fillStyle = player.color;
+        // Enhanced shadow with 3D effect
+        let shadowOffsetX = 4;
+        let shadowOffsetY = 4;
+        let shadowScale = 0.8;
+
+        if (player.isSliding) {
+            shadowOffsetX += player.slideDirection.x * 6;
+            shadowOffsetY += player.slideDirection.y * 6;
+            shadowScale = 1.2;
         }
 
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
         this.ctx.beginPath();
-        this.ctx.arc(player.x, player.y, player.radius, 0, Math.PI * 2);
+        this.ctx.ellipse(player.x + shadowOffsetX, player.y + shadowOffsetY, radius * shadowScale, radius * 0.4, 0, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Player border
-        this.ctx.strokeStyle = 'white';
-        this.ctx.lineWidth = 2;
+        // Player body with gradient and effects
+        let bodyColor = player.color;
+        let lightColor = player.lightColor;
+        let glowColor = player.color;
+
+        if (player.isStunned) {
+            // Flashing effect when stunned
+            const stunFlash = Math.sin(Date.now() * 0.02) > 0;
+            bodyColor = stunFlash ? '#FFB6C1' : '#888888';
+            lightColor = stunFlash ? '#FFC0CB' : '#AAAAAA';
+            glowColor = '#FFD700';
+        } else if (player.isSliding) {
+            // Intense colors when sliding
+            bodyColor = player.team === 1 ? '#FF0000' : '#0000FF';
+            lightColor = player.team === 1 ? '#FF6666' : '#6666FF';
+            glowColor = bodyColor;
+        }
+
+        // Body gradient
+        const bodyGradient = this.ctx.createRadialGradient(
+            player.x - radius * 0.3, player.y - radius * 0.3, 0,
+            player.x, player.y, radius
+        );
+        bodyGradient.addColorStop(0, lightColor);
+        bodyGradient.addColorStop(0.7, bodyColor);
+        bodyGradient.addColorStop(1, this.darkenColor(bodyColor, 0.3));
+
+        // Glow effect for special states
+        if (player.isSliding || player.isStunned) {
+            this.ctx.save();
+            this.ctx.shadowColor = glowColor;
+            this.ctx.shadowBlur = 15;
+            this.ctx.fillStyle = bodyGradient;
+            this.ctx.beginPath();
+            this.ctx.arc(player.x, player.y, radius, 0, Math.PI * 2);
+            this.ctx.fill();
+            this.ctx.restore();
+        }
+
+        // Main body
+        this.ctx.fillStyle = bodyGradient;
+        this.ctx.beginPath();
+        this.ctx.arc(player.x, player.y, radius, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        // Body outline with team color
+        this.ctx.strokeStyle = this.darkenColor(bodyColor, 0.4);
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.arc(player.x, player.y, radius, 0, Math.PI * 2);
         this.ctx.stroke();
 
-        // Player label
+        // Inner highlight
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+        this.ctx.lineWidth = 2;
+        this.ctx.beginPath();
+        this.ctx.arc(player.x, player.y, radius - 2, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        // Player label with shadow
+        this.ctx.save();
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.8)';
+        this.ctx.shadowOffsetX = 1;
+        this.ctx.shadowOffsetY = 1;
+        this.ctx.shadowBlur = 2;
         this.ctx.fillStyle = 'white';
-        this.ctx.font = 'bold 12px Arial';
+        this.ctx.font = 'bold 14px Arial';
         this.ctx.textAlign = 'center';
         this.ctx.textBaseline = 'middle';
         this.ctx.fillText(label, player.x, player.y);
+        this.ctx.restore();
+
+        // Ball ownership indicator
+        if (this.shell.owner === player) {
+            this.ctx.save();
+            this.ctx.shadowColor = '#FFD700';
+            this.ctx.shadowBlur = 10;
+            this.ctx.strokeStyle = '#FFD700';
+            this.ctx.lineWidth = 4;
+            this.ctx.setLineDash([8, 4]);
+            this.ctx.beginPath();
+            this.ctx.arc(player.x, player.y, radius + 8, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+            this.ctx.restore();
+        }
 
         // Slide cooldown indicator
         if (player.slideCooldown > 0) {
-            const cooldownPercent = player.slideCooldown / player.slideMaxCooldown;
-            this.ctx.fillStyle = 'rgba(255, 255, 0, 0.7)';
+            const cooldownPercent = 1 - (player.slideCooldown / player.slideMaxCooldown);
+            this.ctx.fillStyle = 'rgba(255, 215, 0, 0.8)';
             this.ctx.beginPath();
-            this.ctx.arc(player.x, player.y - player.radius - 10, 5, 0, Math.PI * 2 * cooldownPercent);
+            this.ctx.arc(player.x, player.y - radius - 12, 6, -Math.PI/2, -Math.PI/2 + (Math.PI * 2 * cooldownPercent));
+            this.ctx.lineTo(player.x, player.y - radius - 12);
             this.ctx.fill();
+
+            // Cooldown border
+            this.ctx.strokeStyle = '#DAA520';
+            this.ctx.lineWidth = 2;
+            this.ctx.beginPath();
+            this.ctx.arc(player.x, player.y - radius - 12, 6, 0, Math.PI * 2);
+            this.ctx.stroke();
         }
 
-        // Stun indicator
+        // Stun indicator with animation
         if (player.isStunned) {
-            this.ctx.fillStyle = 'yellow';
-            this.ctx.font = 'bold 16px Arial';
-            this.ctx.fillText('⭐', player.x, player.y - player.radius - 15);
+            const time = Date.now() * 0.01;
+            for (let i = 0; i < 3; i++) {
+                const angle = (i / 3) * Math.PI * 2 + time;
+                const starX = player.x + Math.cos(angle) * (radius + 15);
+                const starY = player.y + Math.sin(angle) * (radius + 15) - 10;
+
+                this.ctx.save();
+                this.ctx.translate(starX, starY);
+                this.ctx.rotate(time);
+                this.ctx.fillStyle = '#FFD700';
+                this.ctx.font = 'bold 16px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                this.ctx.fillText('⭐', 0, 0);
+                this.ctx.restore();
+            }
         }
     }
 
-    drawShell() {
-        // Shell shadow
-        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
-        this.ctx.beginPath();
-        this.ctx.arc(this.shell.x + 2, this.shell.y + 2, this.shell.radius, 0, Math.PI * 2);
-        this.ctx.fill();
+    darkenColor(color, factor) {
+        // Simple color darkening function
+        if (color.startsWith('#')) {
+            const r = parseInt(color.slice(1, 3), 16);
+            const g = parseInt(color.slice(3, 5), 16);
+            const b = parseInt(color.slice(5, 7), 16);
+            return `rgb(${Math.floor(r * (1 - factor))}, ${Math.floor(g * (1 - factor))}, ${Math.floor(b * (1 - factor))})`;
+        }
+        return color;
+    }
 
-        // Shell body
-        this.ctx.fillStyle = '#FFD700';
+    drawShell() {
+        // Draw trail first (behind the ball)
+        this.drawShellTrail();
+
+        // Enhanced shadow with motion blur
+        const speed = Math.sqrt(this.shell.vx * this.shell.vx + this.shell.vy * this.shell.vy);
+        const shadowOffset = 3 + speed * 0.5;
+        const shadowBlur = 2 + speed * 0.3;
+
+        this.ctx.save();
+        this.ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+        this.ctx.shadowBlur = shadowBlur;
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        this.ctx.beginPath();
+        this.ctx.ellipse(this.shell.x + shadowOffset, this.shell.y + shadowOffset, this.shell.radius * 0.9, this.shell.radius * 0.4, 0, 0, Math.PI * 2);
+        this.ctx.fill();
+        this.ctx.restore();
+
+        // Main shell body with enhanced gradient
+        const mainGradient = this.ctx.createRadialGradient(
+            this.shell.x - this.shell.radius * 0.3, this.shell.y - this.shell.radius * 0.3, 0,
+            this.shell.x, this.shell.y, this.shell.radius * 1.2
+        );
+        mainGradient.addColorStop(0, '#FFFF66'); // Bright yellow highlight
+        mainGradient.addColorStop(0.3, '#FFD700'); // Gold
+        mainGradient.addColorStop(0.7, '#FFA500'); // Orange
+        mainGradient.addColorStop(1, '#FF8C00'); // Dark orange shadow
+
+        this.ctx.fillStyle = mainGradient;
         this.ctx.beginPath();
         this.ctx.arc(this.shell.x, this.shell.y, this.shell.radius, 0, Math.PI * 2);
         this.ctx.fill();
 
-        // Shell pattern
-        this.ctx.strokeStyle = '#FFA500';
+        // Outer border with glow
+        this.ctx.save();
+        this.ctx.shadowColor = '#FFD700';
+        this.ctx.shadowBlur = 8;
+        this.ctx.strokeStyle = '#FF6347';
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.arc(this.shell.x, this.shell.y, this.shell.radius, 0, Math.PI * 2);
+        this.ctx.stroke();
+        this.ctx.restore();
+
+        // Inner highlight ring
+        this.ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
         this.ctx.lineWidth = 2;
         this.ctx.beginPath();
         this.ctx.arc(this.shell.x, this.shell.y, this.shell.radius - 3, 0, Math.PI * 2);
         this.ctx.stroke();
 
-        // Shell spikes
+        // Rotating shell pattern with enhanced spikes
+        this.ctx.save();
+        this.ctx.translate(this.shell.x, this.shell.y);
+        this.ctx.rotate(this.shell.rotation);
+
+        // Main spikes
         for (let i = 0; i < 8; i++) {
             const angle = (i / 8) * Math.PI * 2;
-            const x1 = this.shell.x + Math.cos(angle) * (this.shell.radius - 5);
-            const y1 = this.shell.y + Math.sin(angle) * (this.shell.radius - 5);
-            const x2 = this.shell.x + Math.cos(angle) * (this.shell.radius + 3);
-            const y2 = this.shell.y + Math.sin(angle) * (this.shell.radius + 3);
+            const innerRadius = this.shell.radius - 8;
+            const outerRadius = this.shell.radius + 6;
 
-            this.ctx.strokeStyle = '#FF6347';
-            this.ctx.lineWidth = 2;
+            // Spike gradient
+            const spikeGradient = this.ctx.createLinearGradient(
+                Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius,
+                Math.cos(angle) * outerRadius, Math.sin(angle) * outerRadius
+            );
+            spikeGradient.addColorStop(0, '#FF8C00');
+            spikeGradient.addColorStop(1, '#FF4500');
+
+            this.ctx.fillStyle = spikeGradient;
             this.ctx.beginPath();
-            this.ctx.moveTo(x1, y1);
-            this.ctx.lineTo(x2, y2);
+            this.ctx.moveTo(Math.cos(angle) * innerRadius, Math.sin(angle) * innerRadius);
+            this.ctx.lineTo(Math.cos(angle + 0.2) * (innerRadius + 2), Math.sin(angle + 0.2) * (innerRadius + 2));
+            this.ctx.lineTo(Math.cos(angle) * outerRadius, Math.sin(angle) * outerRadius);
+            this.ctx.lineTo(Math.cos(angle - 0.2) * (innerRadius + 2), Math.sin(angle - 0.2) * (innerRadius + 2));
+            this.ctx.closePath();
+            this.ctx.fill();
+
+            // Spike outline
+            this.ctx.strokeStyle = '#8B0000';
+            this.ctx.lineWidth = 1;
             this.ctx.stroke();
         }
+
+        // Inner decorative ring
+        this.ctx.strokeStyle = '#FF6347';
+        this.ctx.lineWidth = 3;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, this.shell.radius - 10, 0, Math.PI * 2);
+        this.ctx.stroke();
+
+        // Center core
+        const coreGradient = this.ctx.createRadialGradient(0, 0, 0, 0, 0, 6);
+        coreGradient.addColorStop(0, '#FFFF99');
+        coreGradient.addColorStop(1, '#FFD700');
+
+        this.ctx.fillStyle = coreGradient;
+        this.ctx.beginPath();
+        this.ctx.arc(0, 0, 6, 0, Math.PI * 2);
+        this.ctx.fill();
+
+        this.ctx.strokeStyle = '#FF8C00';
+        this.ctx.lineWidth = 2;
+        this.ctx.stroke();
+
+        this.ctx.restore();
+
+        // Speed lines when moving fast
+        if (speed > 5) {
+            this.drawSpeedLines(speed);
+        }
+    }
+
+    drawSpeedLines(speed) {
+        const lineCount = Math.min(Math.floor(speed / 2), 8);
+        const direction = Math.atan2(this.shell.vy, this.shell.vx);
+
+        this.ctx.save();
+        this.ctx.translate(this.shell.x, this.shell.y);
+        this.ctx.rotate(direction + Math.PI); // Opposite direction of movement
+
+        for (let i = 0; i < lineCount; i++) {
+            const distance = 30 + i * 15;
+            const width = 2 + i * 0.5;
+            const alpha = (1 - i / lineCount) * 0.6;
+
+            this.ctx.strokeStyle = `rgba(255, 255, 255, ${alpha})`;
+            this.ctx.lineWidth = width;
+            this.ctx.lineCap = 'round';
+
+            this.ctx.beginPath();
+            this.ctx.moveTo(distance, -width);
+            this.ctx.lineTo(distance + 20, 0);
+            this.ctx.lineTo(distance, width);
+            this.ctx.stroke();
+        }
+
+        this.ctx.restore();
 
         // Owner indicator
         if (this.shell.owner) {
@@ -1513,6 +2203,90 @@ class CascobolGame {
             this.ctx.beginPath();
             this.ctx.arc(this.shell.x, this.shell.y - this.shell.radius - 10, 5, 0, Math.PI * 2);
             this.ctx.fill();
+        }
+
+        // Protection indicator - escudo dourado quando a bola está protegida
+        if (this.shell.protectionTime > 0) {
+            const protectionAlpha = Math.min(this.shell.protectionTime / this.shell.protectionDuration, 1);
+            this.ctx.save();
+            this.ctx.globalAlpha = protectionAlpha * 0.7;
+
+            // Desenha um escudo dourado ao redor da bola
+            this.ctx.strokeStyle = '#FFD700';
+            this.ctx.lineWidth = 4;
+            this.ctx.setLineDash([8, 4]);
+            this.ctx.beginPath();
+            this.ctx.arc(this.shell.x, this.shell.y, this.shell.radius + 8, 0, Math.PI * 2);
+            this.ctx.stroke();
+            this.ctx.setLineDash([]);
+
+            // Adiciona um símbolo de escudo
+            this.ctx.fillStyle = '#FFD700';
+            this.ctx.font = 'bold 12px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.fillText('🛡️', this.shell.x, this.shell.y - this.shell.radius - 20);
+
+            this.ctx.restore();
+        }
+    }
+
+    drawShellTrail() {
+        if (!this.shell.trail || this.shell.trail.length < 2) return;
+
+        const currentTime = Date.now();
+        const maxAge = 400; // 400ms trail duration
+
+        // Draw trail as connected circles with decreasing opacity and size
+        for (let i = 0; i < this.shell.trail.length; i++) {
+            const point = this.shell.trail[i];
+            const age = currentTime - point.time;
+
+            // Calculate opacity and size based on age
+            const progress = 1 - (age / maxAge);
+            const alpha = progress * 0.8; // Max opacity of 0.8
+            const size = this.shell.radius * (0.2 + progress * 0.6); // Size from 20% to 80% of ball
+
+            if (alpha > 0) {
+                this.ctx.save();
+                this.ctx.globalAlpha = alpha;
+
+                // Create gradient for each trail point
+                const gradient = this.ctx.createRadialGradient(
+                    point.x, point.y, 0,
+                    point.x, point.y, size
+                );
+
+                // Color transitions from bright yellow to orange to red
+                const hue = 60 - (progress * 30); // From red to yellow
+                const saturation = 100;
+                const lightness = 50 + (progress * 30); // Brighter for newer points
+
+                gradient.addColorStop(0, `hsla(${hue}, ${saturation}%, ${lightness + 20}%, ${alpha})`);
+                gradient.addColorStop(1, `hsla(${hue}, ${saturation}%, ${lightness}%, ${alpha * 0.3})`);
+
+                this.ctx.fillStyle = gradient;
+                this.ctx.beginPath();
+                this.ctx.arc(point.x, point.y, size, 0, Math.PI * 2);
+                this.ctx.fill();
+
+                // Add sparkle effect for recent trail points
+                if (progress > 0.7) {
+                    const sparkles = 3;
+                    for (let j = 0; j < sparkles; j++) {
+                        const sparkleAngle = (j / sparkles) * Math.PI * 2 + currentTime * 0.01;
+                        const sparkleDistance = size * 0.8;
+                        const sparkleX = point.x + Math.cos(sparkleAngle) * sparkleDistance;
+                        const sparkleY = point.y + Math.sin(sparkleAngle) * sparkleDistance;
+
+                        this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.8})`;
+                        this.ctx.beginPath();
+                        this.ctx.arc(sparkleX, sparkleY, 1.5, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                }
+
+                this.ctx.restore();
+            }
         }
     }
 
@@ -1542,23 +2316,182 @@ class CascobolGame {
             dy /= length;
         }
 
-        // Draw aim line
-        const aimLength = 50 + chargePower * 50;
-        const endX = player.x + dx * aimLength;
-        const endY = player.y + dy * aimLength;
+        // Calculate arrow length based on charge power (grows with charge)
+        const minLength = 40;
+        const maxLength = 100;
+        const arrowLength = minLength + (maxLength - minLength) * chargePower;
 
-        this.ctx.strokeStyle = `rgba(255, 255, 255, ${0.5 + chargePower * 0.5})`;
-        this.ctx.lineWidth = 3 + chargePower * 3;
-        this.ctx.beginPath();
-        this.ctx.moveTo(player.x, player.y);
-        this.ctx.lineTo(endX, endY);
-        this.ctx.stroke();
+        // Calculate arrow end position
+        const endX = player.x + dx * arrowLength;
+        const endY = player.y + dy * arrowLength;
 
-        // Draw power indicator
-        this.ctx.fillStyle = `rgba(255, ${255 - chargePower * 255}, 0, 0.8)`;
+        // Calculate angle for arrow head
+        const aimAngle = Math.atan2(dy, dx);
+
+        // Draw Mario Party style arrow
+        this.drawMarioPartyArrow(player.x, player.y, endX, endY, aimAngle, chargePower);
+
+    }
+
+    drawMarioPartyArrow(startX, startY, endX, endY, angle, chargePower) {
+        // Calculate arrow dimensions based on charge power
+        const baseWidth = 12 + chargePower * 8; // Width of arrow shaft
+        const headWidth = 25 + chargePower * 15; // Width of arrow head
+        const headLength = 20 + chargePower * 10; // Length of arrow head
+        const shaftLength = Math.sqrt((endX - startX) ** 2 + (endY - startY) ** 2) - headLength;
+
+        // Different colors for kick vs pass
+        let colors;
+        if (this.kickSystem.actionType === 'pass') {
+            // Blue gradient for pass
+            colors = {
+                main: '#4A90E2',
+                light: '#6BB6FF',
+                dark: '#2E5BDA',
+                shadow: '#1E3A8A'
+            };
+        } else {
+            // Orange/Red gradient for kick (Mario Party style)
+            const intensity = chargePower;
+            colors = {
+                main: `rgb(${255}, ${140 - intensity * 40}, ${0})`, // Orange to red-orange
+                light: `rgb(${255}, ${180 - intensity * 30}, ${60})`, // Lighter version
+                dark: `rgb(${200 - intensity * 50}, ${100 - intensity * 60}, ${0})`, // Darker version
+                shadow: `rgb(${120}, ${60}, ${0})` // Shadow color
+            };
+        }
+
+        this.ctx.save();
+        this.ctx.translate(startX, startY);
+        this.ctx.rotate(angle);
+
+        // Draw glow effect first
+        if (chargePower > 0.3) {
+            this.ctx.save();
+            this.ctx.shadowColor = colors.main;
+            this.ctx.shadowBlur = 15 + chargePower * 10;
+            this.ctx.fillStyle = colors.main;
+            this.drawArrowShape(shaftLength, baseWidth, headWidth, headLength);
+            this.ctx.restore();
+        }
+
+        // Draw shadow (offset)
+        this.ctx.save();
+        this.ctx.translate(3, 3);
+        this.ctx.fillStyle = 'rgba(0, 0, 0, 0.4)';
+        this.drawArrowShape(shaftLength, baseWidth, headWidth, headLength);
+        this.ctx.restore();
+
+        // Draw main arrow with gradient
+        const gradient = this.ctx.createLinearGradient(0, -headWidth/2, 0, headWidth/2);
+        gradient.addColorStop(0, colors.light);
+        gradient.addColorStop(0.5, colors.main);
+        gradient.addColorStop(1, colors.dark);
+
+        this.ctx.fillStyle = gradient;
+        this.drawArrowShape(shaftLength, baseWidth, headWidth, headLength);
+
+        // Draw border/outline
+        this.ctx.strokeStyle = colors.shadow;
+        this.ctx.lineWidth = 2;
+        this.ctx.lineJoin = 'round';
+        this.ctx.lineCap = 'round';
+        this.drawArrowShape(shaftLength, baseWidth, headWidth, headLength, true);
+
+        // Draw highlight on top
+        const highlightGradient = this.ctx.createLinearGradient(0, -headWidth/4, 0, 0);
+        highlightGradient.addColorStop(0, 'rgba(255, 255, 255, 0.6)');
+        highlightGradient.addColorStop(1, 'rgba(255, 255, 255, 0.1)');
+
+        this.ctx.fillStyle = highlightGradient;
+        this.drawArrowShape(shaftLength * 0.9, baseWidth * 0.6, headWidth * 0.7, headLength * 0.8);
+
+        // Add sparkle effects for high charge
+        if (chargePower > 0.5) {
+            const sparkleCount = Math.floor(chargePower * 6);
+            for (let i = 0; i < sparkleCount; i++) {
+                const sparkleX = (Math.random() - 0.5) * shaftLength;
+                const sparkleY = (Math.random() - 0.5) * baseWidth;
+                const sparkleSize = 2 + Math.random() * 3;
+                const sparkleAlpha = 0.5 + Math.random() * 0.5;
+
+                this.ctx.fillStyle = `rgba(255, 255, 255, ${sparkleAlpha})`;
+                this.ctx.beginPath();
+                this.ctx.arc(sparkleX, sparkleY, sparkleSize, 0, Math.PI * 2);
+                this.ctx.fill();
+            }
+        }
+
+        this.ctx.restore();
+
+        // Draw power indicator circle at the base
+        const pulseSize = 1 + Math.sin(Date.now() * 0.01) * 0.2;
+        this.ctx.fillStyle = `rgba(255, 255, 255, ${0.4 + chargePower * 0.4})`;
+        this.ctx.strokeStyle = colors.main;
+        this.ctx.lineWidth = 3;
         this.ctx.beginPath();
-        this.ctx.arc(endX, endY, 5 + chargePower * 10, 0, Math.PI * 2);
+        this.ctx.arc(startX, startY, (8 + chargePower * 6) * pulseSize, 0, Math.PI * 2);
         this.ctx.fill();
+        this.ctx.stroke();
+    }
+
+    drawArrowShape(shaftLength, baseWidth, headWidth, headLength, strokeOnly = false) {
+        this.ctx.beginPath();
+
+        // Start from the back of the shaft
+        this.ctx.moveTo(0, -baseWidth/2);
+
+        // Top of shaft
+        this.ctx.lineTo(shaftLength, -baseWidth/2);
+
+        // Top of arrow head
+        this.ctx.lineTo(shaftLength, -headWidth/2);
+
+        // Arrow tip
+        this.ctx.lineTo(shaftLength + headLength, 0);
+
+        // Bottom of arrow head
+        this.ctx.lineTo(shaftLength, headWidth/2);
+
+        // Bottom of shaft
+        this.ctx.lineTo(shaftLength, baseWidth/2);
+
+        // Back to start
+        this.ctx.lineTo(0, baseWidth/2);
+
+        this.ctx.closePath();
+
+        if (strokeOnly) {
+            this.ctx.stroke();
+        } else {
+            this.ctx.fill();
+        }
+    }
+
+    drawPassIndicator() {
+        // Mostra indicação de passe disponível quando jogador tem a bola
+        this.players.forEach(player => {
+            if (this.shell.owner === player && !this.kickSystem.isCharging) {
+                const teammate = this.findNearestTeammate(player);
+                if (teammate) {
+                    // Desenha linha pontilhada para o companheiro
+                    this.ctx.strokeStyle = `rgba(100, 150, 255, 0.5)`;
+                    this.ctx.lineWidth = 2;
+                    this.ctx.setLineDash([5, 5]);
+                    this.ctx.beginPath();
+                    this.ctx.moveTo(player.x, player.y);
+                    this.ctx.lineTo(teammate.x, teammate.y);
+                    this.ctx.stroke();
+                    this.ctx.setLineDash([]); // Reset line dash
+
+                    // Desenha círculo no companheiro
+                    this.ctx.fillStyle = `rgba(100, 150, 255, 0.3)`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(teammate.x, teammate.y, teammate.radius + 5, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
+            }
+        });
     }
 
     drawHitEffects() {
@@ -1567,24 +2500,65 @@ class CascobolGame {
         this.hitEffects.forEach(effect => {
             const progress = effect.time / effect.maxTime;
             const alpha = 1 - progress;
-            const size = 10 + progress * 20;
 
-            this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-            this.ctx.beginPath();
-            this.ctx.arc(effect.x, effect.y, size, 0, Math.PI * 2);
-            this.ctx.fill();
+            if (effect.type === 'pass') {
+                // Draw pass effect - animated line from passer to receiver
+                const lineProgress = Math.min(progress * 2, 1); // Line travels in first half
+                const fadeProgress = Math.max((progress - 0.5) * 2, 0); // Fade in second half
 
-            // Explosion particles
-            for (let i = 0; i < 8; i++) {
-                const angle = (i / 8) * Math.PI * 2;
-                const distance = progress * 30;
-                const x = effect.x + Math.cos(angle) * distance;
-                const y = effect.y + Math.sin(angle) * distance;
+                const currentX = effect.fromX + (effect.toX - effect.fromX) * lineProgress;
+                const currentY = effect.fromY + (effect.toY - effect.fromY) * lineProgress;
 
-                this.ctx.fillStyle = `rgba(255, 255, 0, ${alpha})`;
+                // Draw animated line
+                this.ctx.strokeStyle = `rgba(100, 150, 255, ${alpha})`;
+                this.ctx.lineWidth = 4;
+                this.ctx.setLineDash([10, 5]);
                 this.ctx.beginPath();
-                this.ctx.arc(x, y, 3, 0, Math.PI * 2);
+                this.ctx.moveTo(effect.fromX, effect.fromY);
+                this.ctx.lineTo(currentX, currentY);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+
+                // Draw moving pass indicator
+                if (lineProgress < 1) {
+                    this.ctx.fillStyle = `rgba(100, 150, 255, ${alpha})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(currentX, currentY, 8, 0, Math.PI * 2);
+                    this.ctx.fill();
+
+                    // Add sparkle effect
+                    for (let i = 0; i < 4; i++) {
+                        const angle = (i / 4) * Math.PI * 2 + progress * Math.PI * 4;
+                        const sparkleX = currentX + Math.cos(angle) * 15;
+                        const sparkleY = currentY + Math.sin(angle) * 15;
+
+                        this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha * 0.8})`;
+                        this.ctx.beginPath();
+                        this.ctx.arc(sparkleX, sparkleY, 2, 0, Math.PI * 2);
+                        this.ctx.fill();
+                    }
+                }
+            } else {
+                // Original hit effect
+                const size = 10 + progress * 20;
+
+                this.ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
+                this.ctx.beginPath();
+                this.ctx.arc(effect.x, effect.y, size, 0, Math.PI * 2);
                 this.ctx.fill();
+
+                // Explosion particles
+                for (let i = 0; i < 8; i++) {
+                    const angle = (i / 8) * Math.PI * 2;
+                    const distance = progress * 30;
+                    const x = effect.x + Math.cos(angle) * distance;
+                    const y = effect.y + Math.sin(angle) * distance;
+
+                    this.ctx.fillStyle = `rgba(255, 255, 0, ${alpha})`;
+                    this.ctx.beginPath();
+                    this.ctx.arc(x, y, 3, 0, Math.PI * 2);
+                    this.ctx.fill();
+                }
             }
         });
     }

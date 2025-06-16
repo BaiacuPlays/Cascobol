@@ -1,10 +1,12 @@
 import Head from 'next/head';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import styles from '../styles/Game.module.css';
 
 export default function Home() {
   const gameRef = useRef(null);
   const gameInstanceRef = useRef(null);
+  const router = useRouter();
 
   useEffect(() => {
     // Importa e inicializa o jogo quando o componente monta
@@ -14,7 +16,7 @@ export default function Home() {
 
       // Inicializa o jogo apenas uma vez
       if (gameRef.current && !gameInstanceRef.current) {
-        console.log('Inicializando jogo...');
+        console.log('Inicializando jogo 2D...');
         gameInstanceRef.current = new CascobolGame();
       }
     };
@@ -26,6 +28,10 @@ export default function Home() {
       clearTimeout(timer);
     };
   }, []);
+
+  const goTo3D = () => {
+    router.push('/3d');
+  };
 
   return (
     <>
@@ -42,28 +48,44 @@ export default function Home() {
           <div className={styles.startContent}>
             <h1>🎮 Cascobol</h1>
             <p className={styles.subtitle}>Inspirado no Mario Party 9</p>
+
+            {/* Seletor de Versão */}
+            <div className={styles.versionSelector}>
+              <h3>Escolha a Versão:</h3>
+              <div className={styles.versionButtons}>
+                <button className={`${styles.gameButton} ${styles.versionButton}`} id="startButton">
+                  🎮 Jogar 2D (Original)
+                </button>
+                <button className={`${styles.gameButton} ${styles.versionButton} ${styles.new3d}`} onClick={goTo3D}>
+                  🌟 Jogar 3D (Novo!)
+                </button>
+              </div>
+            </div>
+
             <div className={styles.gameInfo}>
               <h3>Como Jogar:</h3>
               <ul>
                 <li>🎯 <strong>Objetivo:</strong> Elimine todos os 7 Goombas do time adversário</li>
-                <li>⚽ <strong>Controles:</strong></li>
+                <li>⚽ <strong>Jogabilidade:</strong> Segure para chutar (seta vermelha) ou pressione para passar (seta azul). Jogador fica parado durante ações!</li>
+                <li>🏃 <strong>Carrinho Inteligente:</strong> Sem bola = roubar/atordoar | Com bola = passe automático para companheiro!</li>
+                <li>🎮 <strong>Controles:</strong></li>
                 <li className={styles.controls}>
                   <div className={styles.controlsGrid}>
                     <span className={`${styles.playerControls} ${styles.team1}`}>
                       <strong>Jogador 1 (Vermelho):</strong><br />
-                      WASD + Segure Espaço + Shift Esq (Carrinho)
+                      WASD + Espaço (Chute) + C (Passe) + Shift Esq (Carrinho/Passe)
                     </span>
                     <span className={`${styles.playerControls} ${styles.team1}`}>
                       <strong>Jogador 2 (Vermelho):</strong><br />
-                      TFGH + Segure R + Q (Carrinho)
+                      TFGH + R (Chute) + V (Passe) + Q (Carrinho/Passe)
                     </span>
                     <span className={`${styles.playerControls} ${styles.team2}`}>
                       <strong>Jogador 3 (Azul):</strong><br />
-                      Setas + Segure Enter + Shift Dir (Carrinho)
+                      Setas + Enter (Chute) + / (Passe) + Shift Dir (Carrinho/Passe)
                     </span>
                     <span className={`${styles.playerControls} ${styles.team2}`}>
                       <strong>Jogador 4 (Azul):</strong><br />
-                      IJKL + Segure O + U (Carrinho)
+                      IJKL + O (Chute) + P (Passe) + U (Carrinho/Passe)
                     </span>
                   </div>
                 </li>
@@ -71,7 +93,6 @@ export default function Home() {
                 <li>🏆 <strong>Vitória:</strong> Primeiro a eliminar todos os Goombas adversários</li>
               </ul>
             </div>
-            <button id="startButton" className={styles.gameButton}>Iniciar Jogo</button>
           </div>
         </div>
 
@@ -97,23 +118,7 @@ export default function Home() {
             <canvas id="gameCanvas" width="1000" height="600" className={styles.gameCanvas}></canvas>
           </div>
 
-          <div className={styles.controlsDisplay}>
-            <div className={styles.playerControlsInfo}>
-              <div className={styles.team1Controls}>
-                <strong>Time Vermelho:</strong><br />
-                P1: WASD + Segure Espaço + Shift Esq | P2: TFGH + Segure R + Q
-              </div>
-              <div className={styles.team2Controls}>
-                <strong>Time Azul:</strong><br />
-                P3: Setas + Segure Enter + Shift Dir | P4: IJKL + Segure O + U
-              </div>
-            </div>
-            <div className={styles.kickInstructions}>
-              💡 <strong>Dica:</strong> Segure o botão de chute para parar e mirar. Use movimento para girar. Solte no momento certo!<br />
-              ⚡ <strong>Carrinho:</strong> Pressione a tecla de carrinho para fazer um slide tackle! Rouba a bola e atordoa adversários!<br />
-              ⏱️ <strong>Cooldown:</strong> Após um carrinho, aguarde 2 segundos para fazer outro. Jogadores atordoados ficam imóveis por 1 segundo.
-            </div>
-          </div>
+
         </div>
 
         {/* Tela de Fim de Jogo */}
