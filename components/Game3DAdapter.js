@@ -1219,8 +1219,8 @@ export default function Game3DAdapter() {
                         <p>Goombas eliminados: <span id="finalGoombas">7</span></p>
                     </div>
                     <div className={styles.endButtons}>
-                        <button id="playAgainButton" className={styles.gameButton}>Jogar Novamente</button>
-                        <button id="backToMenuButton" className={`${styles.gameButton} ${styles.secondary}`}>Voltar ao Menu</button>
+                        <button id="playAgainButton" className={styles.gameButton} onClick={handlePlayAgain}>Jogar Novamente</button>
+                        <button id="backToMenuButton" className={`${styles.gameButton} ${styles.secondary}`} onClick={handleBackToMenu}>Voltar ao Menu</button>
                     </div>
                 </div>
             </div>

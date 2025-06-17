@@ -3,9 +3,6 @@ import { Canvas, useFrame, useThree, useLoader } from '@react-three/fiber';
 import { Box, Cylinder, Plane, Sphere, Environment, Sky, Stars, PerspectiveCamera } from '@react-three/drei';
 import * as THREE from 'three';
 import { OBJLoader } from 'three/examples/jsm/loaders/OBJLoader';
-import { MTLLoader } from 'three/examples/jsm/loaders/MTLLoader';
-import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader';
-import { FBXLoader } from 'three/examples/jsm/loaders/FBXLoader';
 import { TextureLoader } from 'three';
 
 
@@ -244,33 +241,37 @@ function Field({ gameData }) {
       setTexturas(textureMap);
     });
 
-    // Carrega o modelo 3D
-    const mtlLoader = new MTLLoader();
-    mtlLoader.load('/campo/cenarioecampo.mtl', (materials) => {
-      materials.preload();
-      
-      const objLoader = new OBJLoader();
-      objLoader.setMaterials(materials);
-      objLoader.load('/campo/cenarioecampo.obj', (obj) => {
-        obj.traverse((child) => {
-          if (child.isMesh) {
-            // Aplica materiais e texturas apropriados
-            child.material = new THREE.MeshStandardMaterial({
-              map: texturas.campo,
-              normalMap: texturas.linhas,
-              roughness: 0.8,
-              metalness: 0.2,
-            });
-            child.receiveShadow = true;
-            child.castShadow = true;
-          }
-        });
-        
-        // Ajusta a escala e posição do campo
-        obj.scale.set(0.1, 0.1, 0.1);
-        obj.position.set(0, 0, 0);
-        setCampo(obj);
+    // Carrega o modelo 3D (sem MTL - usando apenas OBJ)
+    const objLoader = new OBJLoader();
+    objLoader.load('/campo/cenarioecampo.obj', (obj) => {
+      obj.traverse((child) => {
+        if (child.isMesh) {
+          // Aplica materiais e texturas apropriados
+          child.material = new THREE.MeshStandardMaterial({
+            map: texturas.campo || null,
+            normalMap: texturas.linhas || null,
+            color: '#2e8b57', // Verde do campo como fallback
+            roughness: 0.8,
+            metalness: 0.2,
+          });
+          child.receiveShadow = true;
+          child.castShadow = true;
+        }
       });
+
+      // Ajusta a escala e posição do campo
+      obj.scale.set(0.1, 0.1, 0.1);
+      obj.position.set(0, 0, 0);
+      setCampo(obj);
+    },
+    // Progress callback
+    (progress) => {
+      console.log('Loading progress:', (progress.loaded / progress.total * 100) + '%');
+    },
+    // Error callback
+    (error) => {
+      console.error('Error loading OBJ model:', error);
+      // Se falhar ao carregar o modelo, usa apenas o plano verde
     });
   }, []);
 
@@ -324,6 +325,111 @@ export default function Game3D({ gameData, onAction }) {
 
         <Field gameData={gameData} />
 
+        {/* Renderizar jogadores */}
+        {gameData && gameData.players && gameData.players.map(player => (
+          <Player3D
+            key={player.id}
+            player={player}
+            isCharging={gameData.kickSystem && gameData.kickSystem.chargingPlayer === player}
+          />
+        ))}
+
+        {/* Renderizar bola/shell */}
+        {gameData && gameData.shell && (
+          <Sphere
+            args={[0.8]}
+            position={[
+              (gameData.shell.x - 500) * 0.07,
+              1,
+              -(gameData.shell.y - 300) * 0.07
+            ]}
+            castShadow
+            receiveShadow
+          >
+            <meshStandardMaterial
+              color="#8B4513"
+              roughness={0.3}
+              metalness={0.1}
+            />
+          </Sphere>
+        )}
+
+        {/* Renderizar Goombas */}
+        {gameData && gameData.goombaPositions && (
+          <>
+            {/* Goombas Team 1 */}
+            {gameData.goombaPositions.team1.map((goomba, index) =>
+              goomba.active && (
+                <group key={`team1-goomba-${index}`} position={[
+                  (goomba.x - 500) * 0.07,
+                  0.5,
+                  -(goomba.y - 300) * 0.07
+                ]}>
+                  {/* Corpo do Goomba */}
+                  <Sphere args={[0.6]} castShadow receiveShadow>
+                    <meshStandardMaterial color="#8B4513" />
+                  </Sphere>
+                  {/* Pés do Goomba */}
+                  <Sphere args={[0.3]} position={[-0.3, -0.5, 0]} castShadow>
+                    <meshStandardMaterial color="#654321" />
+                  </Sphere>
+                  <Sphere args={[0.3]} position={[0.3, -0.5, 0]} castShadow>
+                    <meshStandardMaterial color="#654321" />
+                  </Sphere>
+                  {/* Olhos */}
+                  <Sphere args={[0.1]} position={[-0.2, 0.2, 0.5]} castShadow>
+                    <meshBasicMaterial color="white" />
+                  </Sphere>
+                  <Sphere args={[0.1]} position={[0.2, 0.2, 0.5]} castShadow>
+                    <meshBasicMaterial color="white" />
+                  </Sphere>
+                  <Sphere args={[0.05]} position={[-0.2, 0.2, 0.55]} castShadow>
+                    <meshBasicMaterial color="black" />
+                  </Sphere>
+                  <Sphere args={[0.05]} position={[0.2, 0.2, 0.55]} castShadow>
+                    <meshBasicMaterial color="black" />
+                  </Sphere>
+                </group>
+              )
+            )}
+
+            {/* Goombas Team 2 */}
+            {gameData.goombaPositions.team2.map((goomba, index) =>
+              goomba.active && (
+                <group key={`team2-goomba-${index}`} position={[
+                  (goomba.x - 500) * 0.07,
+                  0.5,
+                  -(goomba.y - 300) * 0.07
+                ]}>
+                  {/* Corpo do Goomba */}
+                  <Sphere args={[0.6]} castShadow receiveShadow>
+                    <meshStandardMaterial color="#8B4513" />
+                  </Sphere>
+                  {/* Pés do Goomba */}
+                  <Sphere args={[0.3]} position={[-0.3, -0.5, 0]} castShadow>
+                    <meshStandardMaterial color="#654321" />
+                  </Sphere>
+                  <Sphere args={[0.3]} position={[0.3, -0.5, 0]} castShadow>
+                    <meshStandardMaterial color="#654321" />
+                  </Sphere>
+                  {/* Olhos */}
+                  <Sphere args={[0.1]} position={[-0.2, 0.2, 0.5]} castShadow>
+                    <meshBasicMaterial color="white" />
+                  </Sphere>
+                  <Sphere args={[0.1]} position={[0.2, 0.2, 0.5]} castShadow>
+                    <meshBasicMaterial color="white" />
+                  </Sphere>
+                  <Sphere args={[0.05]} position={[-0.2, 0.2, 0.55]} castShadow>
+                    <meshBasicMaterial color="black" />
+                  </Sphere>
+                  <Sphere args={[0.05]} position={[0.2, 0.2, 0.55]} castShadow>
+                    <meshBasicMaterial color="black" />
+                  </Sphere>
+                </group>
+              )
+            )}
+          </>
+        )}
 
         <FixedIsometricCamera />
         <ambientLight intensity={1.2} />
