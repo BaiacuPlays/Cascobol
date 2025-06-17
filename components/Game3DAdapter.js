@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Game3D } from './3d/Game3D';
+import Game3D from './3d/Game3D';
 import styles from '../styles/Game.module.css';
 
 // Classe do jogo adaptada para 3D
@@ -548,7 +548,7 @@ class CascobolGame3D {
     updatePlayerMovement() {
         if (this.isResetting || this.isCelebrating || this.playersLocked) return;
 
-        const speed = 0.8;
+        const speed = 1.5;
         const friction = 0.88;
         const deltaTime = 16; // Assumindo 60fps
 
@@ -1098,6 +1098,21 @@ export default function Game3DAdapter() {
             gameInstanceRef.current = new CascobolGame3D((data) => {
                 setGameData(data);
             });
+
+            // Enviar dados iniciais imediatamente
+            setTimeout(() => {
+                if (gameInstanceRef.current) {
+                    gameInstanceRef.current.onGameDataUpdate({
+                        players: gameInstanceRef.current.players,
+                        shell: gameInstanceRef.current.shell,
+                        goombaPositions: gameInstanceRef.current.goombaPositions,
+                        gameState: gameInstanceRef.current.gameState,
+                        team1: gameInstanceRef.current.team1,
+                        team2: gameInstanceRef.current.team2,
+                        kickSystem: gameInstanceRef.current.kickSystem
+                    });
+                }
+            }, 100);
         }
 
         return () => {
